@@ -1,0 +1,153 @@
+.tableSection {
+  margin-bottom: 2rem;
+}
+
+.tableContainer {
+  overflow-x: auto;
+  background: var(--bg-card);
+  backdrop-filter: blur(20px);
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  border: 1px solid var(--border-color);
+}
+
+.cashFlowTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+}
+
+.cashFlowTable thead {
+  background: var(--bg-secondary);
+  border-bottom: 2px solid var(--border-color);
+}
+
+.cashFlowTable th {
+  padding: 1rem;
+  text-align: left;
+  font-weight: 600;
+  color: var(--text-primary);
+  text-transform: uppercase;
+  font-size: 0.85rem;
+  letter-spacing: 0.5px;
+}
+
+.cashFlowTable td {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border-color);
+  color: var(--text-primary);
+}
+
+.cashFlowTable tbody tr:hover {
+  background: var(--bg-secondary);
+}
+
+.colNo {
+  width: 60px;
+  text-align: center;
+}
+
+.colItem {
+  min-width: 200px;
+}
+
+.colIncome {
+  width: 150px;
+  text-align: right;
+  color: var(--success-color);
+}
+
+.colExpense {
+  width: 150px;
+  text-align: right;
+  color: var(--error-color);
+}
+
+.colActions {
+  width: 100px;
+  text-align: center;
+}
+
+.actionButtons {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+  align-items: center;
+}
+
+.editButton,
+.deleteButton {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 1.1rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  opacity: 0.7;
+}
+
+.editButton:hover {
+  opacity: 1;
+  background: var(--bg-secondary);
+}
+
+.deleteButton:hover {
+  opacity: 1;
+  background: var(--error-color);
+  color: white;
+}
+
+.summaryRow {
+  background: var(--bg-secondary);
+  font-weight: 600;
+}
+
+.summaryRow td {
+  border-top: 2px solid var(--border-color);
+  border-bottom: 2px solid var(--border-color);
+  padding: 1rem;
+}
+
+.balanceRow {
+  background: rgba(255, 255, 0, 0.15);
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+.balanceRow td {
+  border-top: 3px solid var(--accent-color);
+  border-bottom: 3px solid var(--accent-color);
+  padding: 1.25rem 1rem;
+}
+
+.balanceRow .colIncome {
+  color: var(--text-primary);
+  font-size: 1.2rem;
+}
+
+@media (max-width: 768px) {
+  .tableContainer {
+    padding: 1rem;
+  }
+  
+  .cashFlowTable {
+    font-size: 0.85rem;
+  }
+  
+  .cashFlowTable th,
+  .cashFlowTable td {
+    padding: 0.5rem;
+  }
+  
+  .colItem {
+    min-width: 150px;
+  }
+  
+  .colIncome,
+  .colExpense {
+    width: 120px;
+  }
+}
+

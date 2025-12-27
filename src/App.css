@@ -1,0 +1,55 @@
+/* Global app styles */
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+}
+
+#root {
+  min-height: 100vh;
+  position: relative;
+}
+
+/* Animated background gradient - eye-protective for light theme */
+body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: 
+    radial-gradient(circle at 20% 50%, rgba(120, 119, 198, 0.15) 0%, transparent 50%),
+    radial-gradient(circle at 80% 80%, rgba(255, 119, 198, 0.15) 0%, transparent 50%),
+    radial-gradient(circle at 40% 20%, rgba(120, 219, 255, 0.1) 0%, transparent 50%);
+  background-size: 200% 200%;
+  animation: gradientShift 15s ease infinite;
+  z-index: -1;
+  pointer-events: none;
+}
+
+/* Warmer, softer background for light theme */
+[data-theme='light'] body::before {
+  background: 
+    radial-gradient(circle at 20% 50%, rgba(250, 235, 215, 0.25) 0%, transparent 50%),
+    radial-gradient(circle at 80% 80%, rgba(255, 228, 196, 0.2) 0%, transparent 50%),
+    radial-gradient(circle at 40% 20%, rgba(245, 245, 220, 0.2) 0%, transparent 50%);
+}
+
+@keyframes gradientShift {
+  0%, 100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+

@@ -1,0 +1,26 @@
+{
+  "name": "ai-test",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "bun --bun run server.ts",
+    "build": "bun build public/index.html --outdir dist --target browser",
+    "preview": "bun run dist/index.html"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "recharts": "^2.10.3",
+    "jspdf": "^2.5.1",
+    "html2canvas": "^1.4.1"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  }
+}
