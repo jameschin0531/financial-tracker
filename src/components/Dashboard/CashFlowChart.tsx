@@ -1,5 +1,5 @@
 import React from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { useFinancialData } from '../../context/FinancialDataContext';
 import { getMonthlyCashFlowData } from '../../services/calculations';
 import { formatCurrency, formatMonth } from '../../utils/formatters';
@@ -20,11 +20,12 @@ const CashFlowChart: React.FC = () => {
     month: formatMonth(item.month),
     Income: item.income,
     Expenses: item.expenses,
+    'Cash Flow': item.income - item.expenses,
   }));
 
   return (
     <ResponsiveContainer width="100%" height={300}>
-      <BarChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+      <LineChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
         <XAxis
           dataKey="month"
@@ -45,9 +46,32 @@ const CashFlowChart: React.FC = () => {
           formatter={(value: number) => formatCurrency(value)}
         />
         <Legend />
-        <Bar dataKey="Income" fill="var(--success-color)" />
-        <Bar dataKey="Expenses" fill="var(--danger-color)" />
-      </BarChart>
+        <Line 
+          type="monotone" 
+          dataKey="Income" 
+          stroke="var(--success-color)" 
+          strokeWidth={2}
+          dot={{ fill: 'var(--success-color)', r: 4 }}
+          activeDot={{ r: 6 }}
+        />
+        <Line 
+          type="monotone" 
+          dataKey="Expenses" 
+          stroke="var(--danger-color)" 
+          strokeWidth={2}
+          dot={{ fill: 'var(--danger-color)', r: 4 }}
+          activeDot={{ r: 6 }}
+        />
+        <Line 
+          type="monotone" 
+          dataKey="Cash Flow" 
+          stroke="var(--accent-color)" 
+          strokeWidth={2}
+          strokeDasharray="5 5"
+          dot={{ fill: 'var(--accent-color)', r: 4 }}
+          activeDot={{ r: 6 }}
+        />
+      </LineChart>
     </ResponsiveContainer>
   );
 };

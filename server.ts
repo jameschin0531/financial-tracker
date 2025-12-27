@@ -259,15 +259,44 @@ serve({
     }
     
 
+    // API endpoint: GET config (API keys for client)
+    if (pathname === '/api/config' && req.method === 'GET') {
+      const config = {
+        alphaVantageApiKey: process.env.ALPHA_VANTAGE_API_KEY || '',
+        coingeckoApiKey: process.env.COINGECKO_API_KEY || '',
+        exchangeRateApiKey: process.env.EXCHANGE_RATE_API_KEY || '',
+      };
+      return new Response(JSON.stringify(config), {
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+        },
+      });
+    }
+    
+    // Helper function to inject API config into HTML
+    const injectApiConfig = async (htmlFile: ReturnType<typeof file>): Promise<string> => {
+      const htmlContent = await htmlFile.text();
+      const apiKey = process.env.ALPHA_VANTAGE_API_KEY || '';
+      return htmlContent.replace(
+        '</head>',
+        `<script>window.__API_CONFIG__ = { ALPHA_VANTAGE_API_KEY: ${JSON.stringify(apiKey)} };</script></head>`
+      );
+    };
+    
     // Serve the HTML file
     if (pathname === '/' || pathname === '/index.html') {
-      return new Response(file('public/index.html'), {
+      const htmlFile = file('public/index.html');
+      const injectedHtml = await injectApiConfig(htmlFile);
+      return new Response(injectedHtml, {
         headers: { 'Content-Type': 'text/html' },
       });
     }
     
     // Default: serve index.html for SPA routing
-    return new Response(file('public/index.html'), {
+    const htmlFile = file('public/index.html');
+    const injectedHtml = await injectApiConfig(htmlFile);
+    return new Response(injectedHtml, {
       headers: { 'Content-Type': 'text/html' },
     });
   },

@@ -15,7 +15,6 @@ import { calculateTotalCryptoPortfolioValue } from '../../services/cryptoCalcula
 import { formatCurrency } from '../../utils/formatters';
 import MetricsCard from './MetricsCard';
 import NetWorthChart from './NetWorthChart';
-import CashFlowChart from './CashFlowChart';
 import AssetAllocationChart from './AssetAllocationChart';
 import CurrentAssetAllocationChart from './CurrentAssetAllocationChart';
 import styles from './Dashboard.module.css';
@@ -146,10 +145,6 @@ const Dashboard: React.FC = () => {
         <div className={styles.chartCard}>
           <h3 className={styles.chartTitle}>Net Worth Over Time</h3>
           <NetWorthChart />
-        </div>
-        <div className={styles.chartCard}>
-          <h3 className={styles.chartTitle}>Monthly Cash Flow</h3>
-          <CashFlowChart />
         </div>
         {data.assets.length > 0 && (
           <div className={styles.chartCard}>

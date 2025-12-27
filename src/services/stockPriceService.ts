@@ -1,8 +1,15 @@
 // Free stock price API using Alpha Vantage (free tier: 5 calls/min, 500 calls/day)
 // Alternative: Yahoo Finance via proxy (no API key needed)
-// For production, user should add their own API key
+// API key is loaded from environment variable via window.__API_CONFIG__
 
-const ALPHA_VANTAGE_API_KEY = 'EO4PFYMJVVHLWDQL'; // Replace with your own key for production
+// Get API key from window config (injected by server) or fallback to empty string
+const getAlphaVantageApiKey = (): string => {
+  if (typeof window !== 'undefined' && window.__API_CONFIG__) {
+    return window.__API_CONFIG__.ALPHA_VANTAGE_API_KEY || '';
+  }
+  return '';
+};
+
 const ALPHA_VANTAGE_BASE = 'https://www.alphavantage.co/query';
 
 interface AlphaVantageResponse {
@@ -33,7 +40,13 @@ export const getStockPrice = async (symbol: string): Promise<number | null> => {
   
   try {
     // Try Alpha Vantage first
-    const url = `${ALPHA_VANTAGE_BASE}?function=GLOBAL_QUOTE&symbol=${cacheKey}&apikey=${ALPHA_VANTAGE_API_KEY}`;
+    const apiKey = getAlphaVantageApiKey();
+    if (!apiKey) {
+      // No API key configured, skip to Yahoo Finance fallback
+      return await getStockPriceYahoo(symbol);
+    }
+    
+    const url = `${ALPHA_VANTAGE_BASE}?function=GLOBAL_QUOTE&symbol=${cacheKey}&apikey=${apiKey}`;
     const response = await fetch(url);
     
     if (!response.ok) {
