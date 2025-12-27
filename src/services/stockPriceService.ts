@@ -2,12 +2,16 @@
 // Alternative: Yahoo Finance via proxy (no API key needed)
 // API key is loaded from environment variable via window.__API_CONFIG__
 
-// Get API key from window config (injected by server) or fallback to empty string
+// Get API key from window config (injected by server) or fallback to default demo key
 const getAlphaVantageApiKey = (): string => {
   if (typeof window !== 'undefined' && window.__API_CONFIG__) {
-    return window.__API_CONFIG__.ALPHA_VANTAGE_API_KEY || '';
+    const apiKey = window.__API_CONFIG__.ALPHA_VANTAGE_API_KEY;
+    if (apiKey && apiKey !== 'your_api_key_here' && apiKey.trim() !== '') {
+      return apiKey;
+    }
   }
-  return '';
+  // Fallback to demo key for development (has rate limits)
+  return 'EO4PFYMJVVHLWDQL';
 };
 
 const ALPHA_VANTAGE_BASE = 'https://www.alphavantage.co/query';
@@ -89,9 +93,9 @@ export const getStockPrice = async (symbol: string): Promise<number | null> => {
 // Fallback: Yahoo Finance via CORS proxy (no API key needed)
 const getStockPriceYahoo = async (symbol: string): Promise<number | null> => {
   try {
-    // Using a CORS proxy to access Yahoo Finance
-    // Note: In production, you should use your own proxy server or API key
     const symbolUpper = symbol.toUpperCase();
+    console.log(`Fetching stock price for ${symbolUpper} from Yahoo Finance`);
+    
     // Try direct access first (may work in some browsers)
     let url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbolUpper}?interval=1d&range=1d`;
     
@@ -105,21 +109,24 @@ const getStockPriceYahoo = async (symbol: string): Promise<number | null> => {
           if (price > 0) {
             const cacheKey = symbolUpper;
             priceCache.set(cacheKey, { price, timestamp: Date.now() });
+            console.log(`Successfully fetched price for ${symbolUpper} from Yahoo Finance: ${price}`);
             return price;
           }
         }
       }
     } catch (corsError) {
       // CORS error, try alternative approach
-      console.log('Direct access failed, trying alternative method');
+      console.log('Direct Yahoo Finance access failed (CORS), trying proxy method');
     }
     
     // Alternative: Use a public CORS proxy (for development only)
     // In production, use your own backend or API key
     const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://query1.finance.yahoo.com/v8/finance/chart/${symbolUpper}?interval=1d&range=1d`)}`;
     
+    console.log(`Trying Yahoo Finance via proxy for ${symbolUpper}`);
     const response = await fetch(proxyUrl);
     if (!response.ok) {
+      console.error(`Yahoo Finance proxy request failed with status ${response.status}`);
       throw new Error('Yahoo Finance request failed');
     }
     
@@ -130,13 +137,15 @@ const getStockPriceYahoo = async (symbol: string): Promise<number | null> => {
       if (price > 0) {
         const cacheKey = symbolUpper;
         priceCache.set(cacheKey, { price, timestamp: Date.now() });
+        console.log(`Successfully fetched price for ${symbolUpper} from Yahoo Finance (via proxy): ${price}`);
         return price;
       }
     }
     
+    console.warn(`No valid price data found for ${symbolUpper} from Yahoo Finance`);
     return null;
   } catch (error) {
-    console.error('Error fetching stock price from Yahoo Finance:', error);
+    console.error(`Error fetching stock price from Yahoo Finance for ${symbol}:`, error);
     return null;
   }
 };
