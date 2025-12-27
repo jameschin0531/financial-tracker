@@ -2,6 +2,8 @@
 
 A comprehensive, user-friendly financial web application that allows you to track and manage your complete financial portfolio without requiring a login. The application features a modern glassmorphism UI design, responsive layout, comprehensive dashboard with key financial metrics, real-time stock and crypto price tracking, and the ability to switch between eye-protective light and dark themes.
 
+**🖥️ Desktop App Available**: This application can also be run as a desktop app! See [README-ELECTRON.md](./README-ELECTRON.md) for details.
+
 ## Features
 
 ### Core Financial Management
