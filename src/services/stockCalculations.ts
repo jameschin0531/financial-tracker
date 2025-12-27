@@ -141,9 +141,6 @@ export const calculateHoldingPandL = (holding: StockHolding, currentExchangeRate
     return { usd: 0, myr: 0, percentage: 0 };
   }
   
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/9d4d5f3a-7801-4344-b6c6-0f62052c4b44',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'stockCalculations.ts:145',message:'P&L calculation start',data:{code:holding.code,marketPrice:holding.marketPrice,avgPrice:holding.avgPrice,avgPriceCurrency:holding.currency,quantity:holding.quantity},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'D'})}).catch(()=>{});
-  // #endregion
   
   // Calculate market value in USD
   // For HKD holdings, marketPrice is in HKD, so convert to USD
@@ -173,9 +170,6 @@ export const calculateHoldingPandL = (holding: StockHolding, currentExchangeRate
   
   const pnlUSD = marketValueUSD - costBasisUSD;
   
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/9d4d5f3a-7801-4344-b6c6-0f62052c4b44',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'stockCalculations.ts:155',message:'P&L calculation values',data:{marketValueUSD,costBasisUSD,pnlUSD,currency:holding.currency},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'D'})}).catch(()=>{});
-  // #endregion
   
   // Convert P&L to MYR for display
   const exchangeRate = currentExchangeRate || holding.exchangeRate || 4.7;

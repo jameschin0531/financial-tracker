@@ -280,9 +280,6 @@ const StockTrackerPage: React.FC = () => {
                       const isExpanded = expandedGroups.has(group.code);
                       const hasMultipleHoldings = group.holdings.length > 1;
                       
-                      // #region agent log
-                      fetch('http://127.0.0.1:7242/ingest/9d4d5f3a-7801-4344-b6c6-0f62052c4b44',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'StockTrackerPage.tsx:268',message:'Rendering group row',data:{code:group.code,weightedAvgMarketPrice:group.weightedAvgMarketPrice,weightedAvgAvgPrice:group.weightedAvgAvgPrice,currency:group.currency,holdingsCount:group.holdings.length},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'display'})}).catch(()=>{});
-                      // #endregion
                       
                       return (
                         <React.Fragment key={group.code}>
@@ -352,9 +349,6 @@ const StockTrackerPage: React.FC = () => {
                           
                           {/* Expanded Holdings */}
                           {isExpanded && hasMultipleHoldings && group.holdings.map((holding) => {
-                            // #region agent log
-                            fetch('http://127.0.0.1:7242/ingest/9d4d5f3a-7801-4344-b6c6-0f62052c4b44',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'StockTrackerPage.tsx:304',message:'Displaying holding prices',data:{code:holding.code,marketPrice:holding.marketPrice,avgPrice:holding.avgPrice,currency:holding.currency,exchangeRate:holding.exchangeRate},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,C'})}).catch(()=>{});
-                            // #endregion
                             // For HKD holdings, marketPrice is in HKD
                             // For USD and MYR holdings, marketPrice is in USD (from API)
                             // Convert to USD for consistent calculation

@@ -88,9 +88,6 @@ const StockHoldingForm: React.FC<StockHoldingFormProps> = ({ holding, onCancel, 
     let marketPrice = holding?.marketPrice;
     let exchangeRate = holding?.exchangeRate;
     
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/9d4d5f3a-7801-4344-b6c6-0f62052c4b44',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'StockHoldingForm.tsx:88',message:'Form submit start',data:{holdingId:holding?.id,existingMarketPrice:holding?.marketPrice,existingCurrency:holding?.currency,newCurrency:currency,stockType,avgPriceInput:avgPrice},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,B,C'})}).catch(()=>{});
-    // #endregion
     
     // For cash, market price equals average price (cash doesn't fluctuate)
     if (stockType === 'Cash') {
@@ -104,16 +101,10 @@ const StockHoldingForm: React.FC<StockHoldingFormProps> = ({ holding, onCancel, 
       setLoadingPrice(true);
       try {
         const priceUSD = await getStockPrice(code.toUpperCase());
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/9d4d5f3a-7801-4344-b6c6-0f62052c4b44',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'StockHoldingForm.tsx:103',message:'Fetched stock price from API',data:{code:code.toUpperCase(),apiPriceUSD:priceUSD,holdingCurrency:currency,isUSD:currency==='USD'},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'A,C'})}).catch(()=>{});
-        // #endregion
         if (priceUSD) {
           // Stock prices from API are always in USD - keep marketPrice in USD regardless of holding currency
           // This ensures market prices are always accurate and comparable
           marketPrice = priceUSD;
-          // #region agent log
-          fetch('http://127.0.0.1:7242/ingest/9d4d5f3a-7801-4344-b6c6-0f62052c4b44',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'StockHoldingForm.tsx:111',message:'Storing market price in USD',data:{priceUSD,holdingCurrency:currency,marketPriceStored:marketPrice},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'HKD-fix'})}).catch(()=>{});
-          // #endregion
         }
       } catch (error) {
         console.error('Error fetching price:', error);
@@ -122,9 +113,6 @@ const StockHoldingForm: React.FC<StockHoldingFormProps> = ({ holding, onCancel, 
     } else if (holding && holding.currency !== currency) {
       // Currency changed during edit - marketPrice stays in USD (no conversion needed)
       // Only avgPrice changes with currency
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/9d4d5f3a-7801-4344-b6c6-0f62052c4b44',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'StockHoldingForm.tsx:135',message:'Currency changed, marketPrice stays in USD',data:{oldCurrency:holding.currency,newCurrency:currency,marketPriceUSD:marketPrice},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'HKD-fix'})}).catch(()=>{});
-      // #endregion
     }
     
     if (currency === 'USD' && !exchangeRate) {
@@ -146,9 +134,6 @@ const StockHoldingForm: React.FC<StockHoldingFormProps> = ({ holding, onCancel, 
       lastUpdated: marketPrice ? new Date().toISOString() : undefined,
     };
     
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/9d4d5f3a-7801-4344-b6c6-0f62052c4b44',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'StockHoldingForm.tsx:129',message:'Holding data before save',data:{avgPrice:holdingData.avgPrice,marketPrice:holdingData.marketPrice,currency:holdingData.currency,exchangeRate:holdingData.exchangeRate,avgPriceCurrency:currency,marketPriceCurrency:'USD (from API)'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,B,C,D'})}).catch(()=>{});
-    // #endregion
 
     if (holding) {
       updateStockHolding(holding.id, holdingData);

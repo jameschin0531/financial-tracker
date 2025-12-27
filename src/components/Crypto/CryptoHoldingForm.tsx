@@ -96,9 +96,6 @@ const CryptoHoldingForm: React.FC<CryptoHoldingFormProps> = ({ holding, onCancel
     let marketPrice = holding?.marketPrice;
     let exchangeRate = holding?.exchangeRate;
     
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/9d4d5f3a-7801-4344-b6c6-0f62052c4b44',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CryptoHoldingForm.tsx:96',message:'Crypto form submit start',data:{holdingId:holding?.id,existingMarketPrice:holding?.marketPrice,existingAvgPrice:holding?.avgPrice,avgPriceInput:avgPrice},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-    // #endregion
     
     if (!marketPrice || !holding) {
       setLoadingPrice(true);
@@ -130,9 +127,6 @@ const CryptoHoldingForm: React.FC<CryptoHoldingFormProps> = ({ holding, onCancel
       lastUpdated: marketPrice ? new Date().toISOString() : undefined,
     };
     
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/9d4d5f3a-7801-4344-b6c6-0f62052c4b44',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CryptoHoldingForm.tsx:127',message:'Crypto holding data before save',data:{avgPrice:holdingData.avgPrice,marketPrice:holdingData.marketPrice,currency:holdingData.currency},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-    // #endregion
 
     if (holding) {
       updateCryptoHolding(holding.id, holdingData);
