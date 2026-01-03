@@ -1,8 +1,7 @@
 import type { FinancialData } from '../types/financial';
+import { getSupabase, isSupabaseInitialized } from './supabaseClient';
 
-const API_URL = '/api/data';
-
-const migrateDataFormat = (data: any): FinancialData => {
+export const migrateDataFormat = (data: any): FinancialData => {
   const defaultAssetCategories = ['Cash', 'Savings Account', 'Checking Account', 'Investment', 'Retirement Account', 'Real Estate', 'Vehicle', 'Other'];
   const defaultLiabilityCategories = ['Credit Card', 'Personal Loan', 'Mortgage', 'Auto Loan', 'Student Loan', 'Medical Debt', 'Other'];
   const defaultExpenseCategories = ['Housing', 'Food', 'Transportation', 'Utilities', 'Healthcare', 'Entertainment', 'Shopping', 'Education', 'Insurance', 'Other'];
@@ -69,70 +68,86 @@ const migrateDataFormat = (data: any): FinancialData => {
   return data as FinancialData;
 };
 
-export const loadFinancialData = async (): Promise<FinancialData> => {
+const getDefaultData = (): FinancialData => ({
+  assets: [],
+  liabilities: [],
+  income: [],
+  expenses: [],
+  assetCategories: ['Cash', 'Savings Account', 'Checking Account', 'Investment', 'Retirement Account', 'Real Estate', 'Vehicle', 'Other'],
+  liabilityCategories: ['Credit Card', 'Personal Loan', 'Mortgage', 'Auto Loan', 'Student Loan', 'Medical Debt', 'Other'],
+  expenseCategories: ['Housing', 'Food', 'Transportation', 'Utilities', 'Healthcare', 'Entertainment', 'Shopping', 'Education', 'Insurance', 'Other'],
+  stockHoldings: [],
+  cryptoHoldings: [],
+  tradingAccounts: [],
+  cryptoAccounts: [],
+  deposits: [],
+});
+
+export const loadFinancialData = async (userId: string): Promise<FinancialData> => {
   try {
-    // Load from file via API (file storage only)
-    console.log('Loading data from file:', API_URL);
-    const response = await fetch(API_URL, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-    
-    if (response.ok) {
-      const data = await response.json();
-      const migrated = migrateDataFormat(data);
-      console.log('Data loaded from file successfully');
-      return migrated;
-    } else {
-      console.warn('File not found, returning default structure');
+    if (!isSupabaseInitialized()) {
+      throw new Error('Supabase not initialized');
     }
+
+    const supabase = getSupabase();
+    
+    console.log('Loading financial data for user:', userId);
+    
+    const { data, error } = await supabase
+      .from('financial_data')
+      .select('data')
+      .eq('user_id', userId)
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') {
+        // No data found, return defaults
+        console.log('No financial data found, returning defaults');
+        return getDefaultData();
+      }
+      throw error;
+    }
+
+    if (data && data.data) {
+      const migrated = migrateDataFormat(data.data);
+      console.log('Financial data loaded successfully');
+      return migrated;
+    }
+
+    return getDefaultData();
   } catch (error) {
-    console.error('Error loading financial data from file:', error);
+    console.error('Error loading financial data:', error);
+    return getDefaultData();
   }
-  
-  // Return default data if file doesn't exist or error occurred
-  console.log('No data found, returning default structure');
-  return {
-    assets: [],
-    liabilities: [],
-    income: [],
-    expenses: [],
-    assetCategories: ['Cash', 'Savings Account', 'Checking Account', 'Investment', 'Retirement Account', 'Real Estate', 'Vehicle', 'Other'],
-    liabilityCategories: ['Credit Card', 'Personal Loan', 'Mortgage', 'Auto Loan', 'Student Loan', 'Medical Debt', 'Other'],
-    expenseCategories: ['Housing', 'Food', 'Transportation', 'Utilities', 'Healthcare', 'Entertainment', 'Shopping', 'Education', 'Insurance', 'Other'],
-    stockHoldings: [],
-    cryptoHoldings: [],
-    tradingAccounts: [],
-    cryptoAccounts: [],
-    deposits: [],
-  };
 };
 
-export const saveFinancialData = async (data: FinancialData): Promise<void> => {
+export const saveFinancialData = async (userId: string, data: FinancialData): Promise<void> => {
   try {
-    console.log('Saving data to file:', API_URL);
-    const response = await fetch(API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(data),
-    });
-    
-    console.log('Save response status:', response.status, response.statusText);
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Save failed with response:', errorText);
-      throw new Error(`Failed to save data: ${response.status} ${response.statusText}`);
+    if (!isSupabaseInitialized()) {
+      throw new Error('Supabase not initialized');
     }
+
+    const supabase = getSupabase();
     
-    const result = await response.json();
-    console.log('Data saved to file successfully:', result);
+    console.log('Saving financial data for user:', userId);
+    
+    const { error } = await supabase
+      .from('financial_data')
+      .upsert({
+        user_id: userId,
+        data: data,
+        updated_at: new Date().toISOString(),
+      }, {
+        onConflict: 'user_id',
+      });
+
+    if (error) {
+      throw error;
+    }
+
+    console.log('Financial data saved successfully');
   } catch (error) {
-    console.error('Error saving financial data to file:', error);
-    throw error; // Re-throw to let caller handle the error
+    console.error('Error saving financial data:', error);
+    throw error;
   }
 };
