@@ -55,6 +55,10 @@
   gap: 1rem;
 }
 
+.exportAction {
+  display: block;
+}
+
 .userInfo {
   display: flex;
   align-items: center;
@@ -107,6 +111,23 @@
 
   .headerContent {
     padding: 0 1rem;
+  }
+
+  .exportAction {
+    display: none;
+  }
+
+  .headerActions {
+    gap: 0.5rem;
+  }
+
+  .userEmail {
+    display: none;
+  }
+
+  .userInfo {
+    padding: 0.25rem 0.5rem;
+    gap: 0.5rem;
   }
 }
 

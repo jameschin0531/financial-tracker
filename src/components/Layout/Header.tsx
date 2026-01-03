@@ -41,7 +41,9 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
               </button>
             </div>
           )}
-          <ExportButton />
+          <div className={styles.exportAction}>
+            <ExportButton />
+          </div>
           <ThemeToggle />
         </div>
       </div>
