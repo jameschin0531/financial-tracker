@@ -303,16 +303,24 @@ Your preference is automatically saved.
 
 ## Data Storage
 
-All financial data is stored in a local file (`data/financial-data.json`) in the project directory. This means:
-- Your data is stored on your local machine
-- No account or login is required
-- Data persists across browser sessions
-- Data is automatically saved on every change
+**NEW: Supabase Cloud Storage**
+
+Financial data is now stored securely in Supabase (PostgreSQL) with user authentication:
+- **Secure Authentication**: Login with Google or GitHub OAuth
+- **Cloud Sync**: Access your data from any device
+- **Privacy Protected**: Row Level Security ensures you only see your own data
+- **Auto-save**: Changes are automatically saved to the cloud (with 1-second debounce)
+- **No Data Loss**: Your data persists across devices and sessions
+
+**Local Development:**
+- For local development, data can still be stored using the Bun server
+- See `DEPLOYMENT.md` for setup instructions
 
 **Important**: 
-- The `data/` directory is included in `.gitignore` to keep your financial data private
+- You must sign in to access your financial data
+- Data is encrypted in transit and at rest
 - Always export your data regularly as a backup
-- The data file is stored server-side and accessed via API endpoints (`/api/data`)
+- See `DEPLOYMENT.md` for deployment to Vercel + Supabase
 
 ## API Integration
 

@@ -8,7 +8,7 @@
   "main": "electron/main.cjs",
   "scripts": {
     "dev": "bun --bun run server.ts",
-    "build": "bun build public/index.html --outdir dist --target browser",
+    "build": "bun build src/index.tsx --outdir dist --target browser --minify && cp public/index.html dist/index.html",
     "preview": "bun run dist/index.html",
     "electron": "electron .",
     "electron:dev": "cross-env NODE_ENV=development electron .",
@@ -19,6 +19,7 @@
     "electron:build:linux": "electron-builder --linux"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.39.3",
     "html2canvas": "^1.4.1",
     "jspdf": "^2.5.1",
     "react": "^18.2.0",
@@ -29,6 +30,7 @@
     "@types/bun": "latest",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
+    "@vercel/node": "^3.0.12",
     "cross-env": "^7.0.3",
     "electron": "^28.3.3",
     "electron-builder": "^24.13.3"

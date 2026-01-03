@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { ThemeProvider } from './context/ThemeContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import { FinancialDataProvider } from './context/FinancialDataContext';
 import Layout from './components/Layout/Layout';
 import Dashboard from './components/Dashboard/Dashboard';
@@ -8,10 +9,12 @@ import LiabilitiesPage from './pages/LiabilitiesPage';
 import CashFlowPage from './pages/CashFlowPage';
 import StockTrackerPage from './pages/StockTrackerPage';
 import CryptoTrackerPage from './pages/CryptoTrackerPage';
+import AuthPage from './pages/AuthPage';
 import './App.css';
 
-function App() {
+function AppContent() {
   const [currentPage, setCurrentPage] = useState('dashboard');
+  const { session, loading } = useAuth();
 
   const renderPage = () => {
     switch (currentPage) {
@@ -32,13 +35,43 @@ function App() {
     }
   };
 
+  // Show loading state while checking auth
+  if (loading) {
+    return (
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        height: '100vh',
+        color: 'var(--text-primary)',
+        background: 'var(--bg-primary)'
+      }}>
+        Loading...
+      </div>
+    );
+  }
+
+  // Show auth page if not logged in
+  if (!session) {
+    return <AuthPage />;
+  }
+
+  // Show main app if logged in
+  return (
+    <FinancialDataProvider>
+      <Layout currentPage={currentPage} onPageChange={setCurrentPage}>
+        {renderPage()}
+      </Layout>
+    </FinancialDataProvider>
+  );
+}
+
+function App() {
   return (
     <ThemeProvider>
-      <FinancialDataProvider>
-        <Layout currentPage={currentPage} onPageChange={setCurrentPage}>
-          {renderPage()}
-        </Layout>
-      </FinancialDataProvider>
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
     </ThemeProvider>
   );
 }

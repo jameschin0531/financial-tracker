@@ -1,15 +1,27 @@
 // Free stock price API using Alpha Vantage (free tier: 5 calls/min, 500 calls/day)
 // Alternative: Yahoo Finance via proxy (no API key needed)
-// API key is loaded from environment variable via window.__API_CONFIG__
 
-// Get API key from window config (injected by server) or fallback to default demo key
+// Store API key from config
+let cachedApiKey: string | null = null;
+
+export const setAlphaVantageApiKey = (apiKey: string) => {
+  cachedApiKey = apiKey;
+};
+
+// Get API key from cache or fallback to demo key
 const getAlphaVantageApiKey = (): string => {
+  if (cachedApiKey && cachedApiKey.trim() !== '' && cachedApiKey !== 'your_api_key_here') {
+    return cachedApiKey;
+  }
+  
+  // Legacy fallback: check window.__API_CONFIG__ (for backwards compatibility)
   if (typeof window !== 'undefined' && window.__API_CONFIG__) {
     const apiKey = window.__API_CONFIG__.ALPHA_VANTAGE_API_KEY;
     if (apiKey && apiKey !== 'your_api_key_here' && apiKey.trim() !== '') {
       return apiKey;
     }
   }
+  
   // Fallback to demo key for development (has rate limits)
   return 'EO4PFYMJVVHLWDQL';
 };

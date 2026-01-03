@@ -1,7 +1,8 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 import type { Asset, Liability, Income, Expense, FinancialData, StockHolding, CryptoHolding, TradingAccount, CryptoAccount, Deposit } from '../types/financial';
 import { loadFinancialData, saveFinancialData } from '../services/storageService';
+import { useAuth } from './AuthContext';
 
 interface FinancialDataContextType {
   data: FinancialData;
@@ -50,43 +51,76 @@ const generateId = (): string => {
   return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 };
 
-export const FinancialDataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [data, setData] = useState<FinancialData>({
-    assets: [],
-    liabilities: [],
-    income: [],
-    expenses: [],
-    assetCategories: ['Cash', 'Savings Account', 'Checking Account', 'Investment', 'Retirement Account', 'Real Estate', 'Vehicle', 'Other'],
-    liabilityCategories: ['Credit Card', 'Personal Loan', 'Mortgage', 'Auto Loan', 'Student Loan', 'Medical Debt', 'Other'],
-    stockHoldings: [],
-    cryptoHoldings: [],
-    tradingAccounts: [],
-    cryptoAccounts: [],
-    deposits: [],
-  });
-  const [isLoading, setIsLoading] = useState(true);
+const getDefaultData = (): FinancialData => ({
+  assets: [],
+  liabilities: [],
+  income: [],
+  expenses: [],
+  assetCategories: ['Cash', 'Savings Account', 'Checking Account', 'Investment', 'Retirement Account', 'Real Estate', 'Vehicle', 'Other'],
+  liabilityCategories: ['Credit Card', 'Personal Loan', 'Mortgage', 'Auto Loan', 'Student Loan', 'Medical Debt', 'Other'],
+  expenseCategories: ['Housing', 'Food', 'Transportation', 'Utilities', 'Healthcare', 'Entertainment', 'Shopping', 'Education', 'Insurance', 'Other'],
+  stockHoldings: [],
+  cryptoHoldings: [],
+  tradingAccounts: [],
+  cryptoAccounts: [],
+  deposits: [],
+});
 
-  // Load data on mount
+export const FinancialDataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const { user, session } = useAuth();
+  const [data, setData] = useState<FinancialData>(getDefaultData());
+  const [isLoading, setIsLoading] = useState(true);
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Load data when user logs in
   useEffect(() => {
     const loadData = async () => {
+      if (!user) {
+        // User logged out, reset to defaults
+        setData(getDefaultData());
+        setIsLoading(false);
+        return;
+      }
+
       try {
-        const loadedData = await loadFinancialData();
+        setIsLoading(true);
+        const loadedData = await loadFinancialData(user.id);
         setData(loadedData);
       } catch (error) {
         console.error('Error loading financial data:', error);
+        setData(getDefaultData());
       } finally {
         setIsLoading(false);
       }
     };
     loadData();
-  }, []);
+  }, [user]);
 
-  // Save data when it changes
+  // Debounced save when data changes
   useEffect(() => {
-    if (!isLoading) {
-      saveFinancialData(data);
+    if (isLoading || !user) {
+      return;
     }
-  }, [data, isLoading]);
+
+    // Clear existing timeout
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+
+    // Set new timeout for debounced save
+    saveTimeoutRef.current = setTimeout(() => {
+      saveFinancialData(user.id, data).catch((error) => {
+        console.error('Error saving financial data:', error);
+      });
+    }, 1000); // 1 second debounce
+
+    // Cleanup on unmount
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, [data, isLoading, user]);
 
   const addAsset = (asset: Omit<Asset, 'id'>) => {
     setData(prev => ({
