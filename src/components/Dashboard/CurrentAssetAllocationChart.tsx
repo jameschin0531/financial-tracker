@@ -60,8 +60,9 @@ const CurrentAssetAllocationChart: React.FC = () => {
         </Pie>
         <Tooltip
           contentStyle={{
-            backgroundColor: 'var(--bg-card)',
-            border: '1px solid var(--border-color)',
+            backgroundColor: '#ffffff',
+            color: '#111827',
+            border: '1px solid rgba(0,0,0,0.12)',
             borderRadius: '4px',
           }}
           formatter={(value: number) => formatCurrency(value)}

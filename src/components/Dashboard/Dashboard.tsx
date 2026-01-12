@@ -3,12 +3,9 @@ import { useFinancialData } from '../../context/FinancialDataContext';
 import {
   calculateTotalAssets,
   calculateCurrentAssets,
-  calculateFixedAssets,
   calculateTotalLiabilities,
   calculateNetWorth,
   calculateMonthlyIncome,
-  calculateMonthlyExpenses,
-  calculateCashFlow,
 } from '../../services/calculations';
 import { calculateTotalPortfolioValue } from '../../services/stockCalculations';
 import { calculateTotalCryptoPortfolioValue } from '../../services/cryptoCalculations';
@@ -43,8 +40,6 @@ const Dashboard: React.FC = () => {
   }, [data.assets, data.liabilities, data.stockHoldings, data.cryptoHoldings]);
 
   const currentAssets = calculateCurrentAssets(data.assets);
-  const currentAssetsWithPortfolios = currentAssets + stockPortfolioValue + cryptoPortfolioValue;
-  const fixedAssets = calculateFixedAssets(data.assets);
   const totalLiabilities = calculateTotalLiabilities(data.liabilities);
   const monthlyIncome = calculateMonthlyIncome(data.income);
   // Calculate total expenses (sum of all expenses, not filtered by current month)
@@ -61,42 +56,33 @@ const Dashboard: React.FC = () => {
   }, 0);
   const cashFlow = monthlyIncome - monthlyExpenses;
 
-  // Build subtitle for Current Assets showing breakdown
-  const currentAssetsSubtitleParts = [];
-  if (currentAssets > 0) {
-    currentAssetsSubtitleParts.push('Liquid assets');
-  }
-  if (stockPortfolioValue > 0) {
-    currentAssetsSubtitleParts.push(`Stock: ${formatCurrency(stockPortfolioValue)}`);
-  }
-  if (cryptoPortfolioValue > 0) {
-    currentAssetsSubtitleParts.push(`Crypto: ${formatCurrency(cryptoPortfolioValue)}`);
-  }
-  const currentAssetsSubtitle = currentAssetsSubtitleParts.length > 0 
-    ? currentAssetsSubtitleParts.join(' • ')
-    : 'Liquid assets';
-
   return (
     <div className={styles.dashboard}>
       <div className={styles.dashboardHeader}>
         <h1 className={styles.dashboardTitle}>Financial Overview</h1>
       </div>
       
-      {/* Section 1: Current Assets & Fixed Assets */}
+      {/* Section 1: Assets */}
       <div className={styles.section}>
         <h2 className={styles.sectionTitle}>Assets</h2>
         <div className={styles.sectionGrid}>
           <MetricsCard
             title="Current Assets"
-            value={formatCurrency(currentAssetsWithPortfolios)}
-            subtitle={currentAssetsSubtitle}
+            value={formatCurrency(currentAssets)}
+            subtitle={''}
             trend="positive"
           />
           <MetricsCard
-            title="Fixed Assets"
-            value={formatCurrency(fixedAssets)}
-            subtitle={`Long-term assets`}
-            trend="positive"
+            title="Stock"
+            value={formatCurrency(stockPortfolioValue)}
+            subtitle={data.stockHoldings.length > 0 ? `${data.stockHoldings.length} holding${data.stockHoldings.length !== 1 ? 's' : ''}` : 'No holdings'}
+            trend={stockPortfolioValue > 0 ? 'positive' : 'neutral'}
+          />
+          <MetricsCard
+            title="Crypto"
+            value={formatCurrency(cryptoPortfolioValue)}
+            subtitle={data.cryptoHoldings.length > 0 ? `${data.cryptoHoldings.length} holding${data.cryptoHoldings.length !== 1 ? 's' : ''}` : 'No holdings'}
+            trend={cryptoPortfolioValue > 0 ? 'positive' : 'neutral'}
           />
         </div>
       </div>
@@ -125,44 +111,7 @@ const Dashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Section 3: Investment Portfolios */}
-      <div className={styles.section}>
-        <h2 className={styles.sectionTitle}>Investment Portfolios</h2>
-        <div className={styles.sectionGrid}>
-          {data.stockHoldings.length > 0 ? (
-            <MetricsCard
-              title="Stock Portfolio"
-              value={formatCurrency(stockPortfolioValue)}
-              subtitle={`${data.stockHoldings.length} holding${data.stockHoldings.length !== 1 ? 's' : ''}`}
-              trend="positive"
-            />
-          ) : (
-            <MetricsCard
-              title="Stock Portfolio"
-              value={formatCurrency(0)}
-              subtitle="No holdings"
-              trend="neutral"
-            />
-          )}
-          {data.cryptoHoldings.length > 0 ? (
-            <MetricsCard
-              title="Crypto Portfolio"
-              value={formatCurrency(cryptoPortfolioValue)}
-              subtitle={`${data.cryptoHoldings.length} holding${data.cryptoHoldings.length !== 1 ? 's' : ''}`}
-              trend="positive"
-            />
-          ) : (
-            <MetricsCard
-              title="Crypto Portfolio"
-              value={formatCurrency(0)}
-              subtitle="No holdings"
-              trend="neutral"
-            />
-          )}
-        </div>
-      </div>
-
-      {/* Section 4: Cash Flow */}
+      {/* Section 3: Cash Flow */}
       <div className={styles.section}>
         <h2 className={styles.sectionTitle}>Cash Flow</h2>
         <div className={styles.sectionGrid}>

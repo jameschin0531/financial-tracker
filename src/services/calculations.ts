@@ -110,25 +110,54 @@ export const calculateMonthlyIncome = (income: Income[]): number => {
 };
 
 export const calculateMonthlyExpenses = (expenses: Expense[]): number => {
-  const now = new Date();
-  const currentMonth = now.getMonth();
-  const currentYear = now.getFullYear();
-
+  // In this app, expenses are treated as the monthly expense list (not a ledger filtered by date),
+  // so we sum all items and convert to MYR.
   return expenses.reduce((sum, expense) => {
-    const expenseDate = new Date(expense.date);
-    if (
-      expenseDate.getMonth() === currentMonth &&
-      expenseDate.getFullYear() === currentYear
-    ) {
-      // Convert to MYR
-      return sum + convertToMYR(expense.amount, expense.currency, expense.exchangeRate);
-    }
-    return sum;
+    return sum + convertToMYR(expense.amount, expense.currency, expense.exchangeRate);
   }, 0);
 };
 
 export const calculateCashFlow = (income: Income[], expenses: Expense[]): number => {
   return calculateMonthlyIncome(income) - calculateMonthlyExpenses(expenses);
+};
+
+const toISODate = (d: Date): string => {
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+};
+
+// Monday-based start of week (local time) for consistent weekly grouping.
+const startOfWeekISO = (isoDate: string): string => {
+  const d = new Date(isoDate);
+  // If parsing fails, fall back to today to avoid breaking charts
+  if (Number.isNaN(d.getTime())) {
+    return toISODate(new Date());
+  }
+  const day = d.getDay(); // 0 (Sun) - 6 (Sat)
+  const diffToMonday = (day + 6) % 7;
+  d.setDate(d.getDate() - diffToMonday);
+  d.setHours(0, 0, 0, 0);
+  return toISODate(d);
+};
+
+export const getWeeklyNetWorthHistory = async (
+  data: FinancialData
+): Promise<Array<{ date: string; netWorth: number }>> => {
+  const daily = await getNetWorthHistory(data);
+  if (daily.length === 0) return [];
+
+  const weekMap = new Map<string, number>();
+  // Take the latest netWorth within each week (so the weekly chart trends with time)
+  daily.forEach((point) => {
+    const week = startOfWeekISO(point.date);
+    weekMap.set(week, point.netWorth);
+  });
+
+  return Array.from(weekMap.entries())
+    .map(([date, netWorth]) => ({ date, netWorth }))
+    .sort((a, b) => a.date.localeCompare(b.date));
 };
 
 export const getNetWorthHistory = async (data: FinancialData): Promise<Array<{ date: string; netWorth: number }>> => {
