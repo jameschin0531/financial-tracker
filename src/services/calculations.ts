@@ -165,6 +165,7 @@ export const getNetWorthHistory = async (data: FinancialData): Promise<Array<{ d
   
   data.assets.forEach(asset => allDates.add(asset.date));
   data.liabilities.forEach(liability => allDates.add(liability.date));
+  allDates.add(toISODate(new Date()));
   
   const sortedDates = Array.from(allDates).sort();
   

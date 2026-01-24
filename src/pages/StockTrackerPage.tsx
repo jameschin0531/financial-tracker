@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useFinancialData } from '../context/FinancialDataContext';
 import type { StockHolding, TradingAccount, Deposit } from '../types/financial';
-import { getStockPrice, getStockPrices } from '../services/stockPriceService';
+import { getStockPrices } from '../services/stockPriceService';
 import { getUSDToMYRRate, getUSDToHKDRate } from '../services/exchangeRateService';
 import {
   calculateTotalPortfolioValue,
@@ -20,8 +20,7 @@ import styles from './StockTracker.module.css';
 const StockTrackerPage: React.FC = () => {
   const { 
     data, 
-    updateStockPrice, 
-    updateStockHolding,
+    updateStockPrices,
     deleteStockHolding,
     deleteTradingAccount,
     deleteDeposit,
@@ -108,17 +107,15 @@ const StockTrackerPage: React.FC = () => {
   const handleUpdatePrices = async () => {
     setLoadingPrices(true);
     try {
-      const symbols = [...new Set(data.stockHoldings.map(h => h.code))];
+      const symbols = [...new Set(
+        data.stockHoldings
+          .filter(h => h.stockType !== 'Cash')
+          .map(h => h.code)
+      )];
       const pricesUSD = await getStockPrices(symbols);
       
       // Update prices for all holdings - market prices are always stored in USD
-      for (const holding of data.stockHoldings) {
-        const priceUSD = pricesUSD.get(holding.code.toUpperCase());
-        if (priceUSD !== undefined) {
-          // Market price is always in USD regardless of holding currency
-          updateStockPrice(holding.id, priceUSD);
-        }
-      }
+      updateStockPrices(pricesUSD);
     } catch (error) {
       console.error('Error updating prices:', error);
       alert('Failed to update stock prices. Please try again.');

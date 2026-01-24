@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useFinancialData } from '../context/FinancialDataContext';
 import type { CryptoHolding, CryptoAccount } from '../types/financial';
-import { getCryptoPrice, getCryptoPrices } from '../services/cryptoPriceService';
+import { getCryptoPrices } from '../services/cryptoPriceService';
 import {
   calculateTotalCryptoPortfolioValue,
   calculateCryptoHoldingPandL,
@@ -16,8 +16,7 @@ import styles from './StockTracker.module.css';
 const CryptoTrackerPage: React.FC = () => {
   const { 
     data, 
-    updateCryptoPrice, 
-    updateCryptoHolding,
+    updateCryptoPrices,
     deleteCryptoHolding,
     deleteCryptoAccount,
   } = useFinancialData();
@@ -46,12 +45,7 @@ const CryptoTrackerPage: React.FC = () => {
       const prices = await getCryptoPrices(symbols);
       
       // Update prices for all holdings
-      for (const holding of data.cryptoHoldings) {
-        const price = prices.get(holding.symbol.toUpperCase());
-        if (price !== undefined) {
-          updateCryptoPrice(holding.id, price);
-        }
-      }
+      updateCryptoPrices(prices);
     } catch (error) {
       console.error('Error updating prices:', error);
       alert('Failed to update crypto prices. Please try again.');

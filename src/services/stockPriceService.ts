@@ -27,6 +27,7 @@ const getAlphaVantageApiKey = (): string => {
 };
 
 const ALPHA_VANTAGE_BASE = 'https://www.alphavantage.co/query';
+const YAHOO_QUOTE_BASE = 'https://query1.finance.yahoo.com/v7/finance/quote?symbols=';
 
 interface AlphaVantageResponse {
   'Global Quote'?: {
@@ -162,20 +163,91 @@ const getStockPriceYahoo = async (symbol: string): Promise<number | null> => {
   }
 };
 
+const getStockPricesYahooBatch = async (symbols: string[]): Promise<Map<string, number>> => {
+  const prices = new Map<string, number>();
+  if (symbols.length === 0) {
+    return prices;
+  }
+
+  const symbolList = symbols.map(symbol => symbol.toUpperCase()).join(',');
+  const baseUrl = `${YAHOO_QUOTE_BASE}${encodeURIComponent(symbolList)}`;
+
+  const fetchBatch = async (url: string): Promise<boolean> => {
+    const response = await fetch(url);
+    if (!response.ok) {
+      return false;
+    }
+
+    const data = await response.json();
+    const results = data?.quoteResponse?.result;
+    if (!Array.isArray(results)) {
+      return false;
+    }
+
+    results.forEach((item: { symbol?: string; regularMarketPrice?: number }) => {
+      const symbol = item.symbol?.toUpperCase();
+      const price = item.regularMarketPrice;
+      if (symbol && typeof price === 'number' && price > 0) {
+        prices.set(symbol, price);
+        priceCache.set(symbol, { price, timestamp: Date.now() });
+      }
+    });
+
+    return prices.size > 0;
+  };
+
+  try {
+    const ok = await fetchBatch(baseUrl);
+    if (ok) {
+      return prices;
+    }
+  } catch (error) {
+    console.warn('Yahoo Finance batch request failed, trying proxy', error);
+  }
+
+  try {
+    const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(baseUrl)}`;
+    await fetchBatch(proxyUrl);
+  } catch (error) {
+    console.error('Yahoo Finance batch proxy failed:', error);
+  }
+
+  return prices;
+};
+
 // Batch fetch multiple stock prices
 export const getStockPrices = async (symbols: string[]): Promise<Map<string, number>> => {
   const prices = new Map<string, number>();
-  
-  // Fetch prices with delay to avoid rate limits
-  for (const symbol of symbols) {
-    const price = await getStockPrice(symbol);
-    if (price !== null) {
-      prices.set(symbol.toUpperCase(), price);
-    }
-    // Small delay to avoid rate limiting
-    await new Promise(resolve => setTimeout(resolve, 200));
+  const uniqueSymbols = Array.from(new Set(symbols.map(symbol => symbol.toUpperCase()).filter(Boolean)));
+  if (uniqueSymbols.length === 0) {
+    return prices;
   }
-  
+
+  const batchPrices = await getStockPricesYahooBatch(uniqueSymbols);
+  batchPrices.forEach((price, symbol) => {
+    prices.set(symbol, price);
+  });
+
+  const missingSymbols = uniqueSymbols.filter(symbol => !prices.has(symbol));
+  if (missingSymbols.length === 0) {
+    return prices;
+  }
+
+  const concurrency = Math.min(3, missingSymbols.length);
+  let currentIndex = 0;
+
+  const workers = new Array(concurrency).fill(null).map(async () => {
+    while (currentIndex < missingSymbols.length) {
+      const symbol = missingSymbols[currentIndex];
+      currentIndex += 1;
+      const price = await getStockPrice(symbol);
+      if (price !== null) {
+        prices.set(symbol.toUpperCase(), price);
+      }
+    }
+  });
+
+  await Promise.all(workers);
   return prices;
 };
 

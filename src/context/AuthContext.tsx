@@ -16,7 +16,7 @@ interface AuthContextType {
   session: Session | null;
   loading: boolean;
   config: AppConfig | null;
-  signInWithOAuth: (provider: 'google' | 'github') => Promise<void>;
+  signInWithOAuth: (provider: 'google') => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -131,7 +131,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  const signInWithOAuth = async (provider: 'google' | 'github') => {
+  const signInWithOAuth = async (provider: 'google') => {
     try {
       if (!isSupabaseInitialized()) {
         throw new Error('Supabase not initialized');

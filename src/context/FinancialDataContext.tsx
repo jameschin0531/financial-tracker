@@ -2,6 +2,9 @@ import React, { createContext, useContext, useState, useEffect, useRef } from 'r
 import type { ReactNode } from 'react';
 import type { Asset, Liability, Income, Expense, FinancialData, StockHolding, CryptoHolding, TradingAccount, CryptoAccount, Deposit } from '../types/financial';
 import { loadFinancialData, saveFinancialData } from '../services/storageService';
+import { getStockPrices } from '../services/stockPriceService';
+import { getCryptoPrices } from '../services/cryptoPriceService';
+import { getHKDToMYRRate, getUSDToMYRRate } from '../services/exchangeRateService';
 import { useAuth } from './AuthContext';
 
 interface FinancialDataContextType {
@@ -26,11 +29,13 @@ interface FinancialDataContextType {
   updateStockHolding: (id: string, holding: Partial<StockHolding>) => void;
   deleteStockHolding: (id: string) => void;
   updateStockPrice: (id: string, price: number) => void;
+  updateStockPrices: (prices: Map<string, number>) => void;
   // Crypto tracking
   addCryptoHolding: (holding: Omit<CryptoHolding, 'id'>) => void;
   updateCryptoHolding: (id: string, holding: Partial<CryptoHolding>) => void;
   deleteCryptoHolding: (id: string) => void;
   updateCryptoPrice: (id: string, price: number) => void;
+  updateCryptoPrices: (prices: Map<string, number>) => void;
   // Trading accounts (for stocks)
   addTradingAccount: (account: Omit<TradingAccount, 'id'>) => void;
   updateTradingAccount: (id: string, account: Partial<TradingAccount>) => void;
@@ -71,6 +76,7 @@ export const FinancialDataProvider: React.FC<{ children: ReactNode }> = ({ child
   const [data, setData] = useState<FinancialData>(getDefaultData());
   const [isLoading, setIsLoading] = useState(true);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const initialRefreshRef = useRef<{ userId: string | null; inFlight: boolean }>({ userId: null, inFlight: false });
 
   // Load data when user logs in
   useEffect(() => {
@@ -95,6 +101,96 @@ export const FinancialDataProvider: React.FC<{ children: ReactNode }> = ({ child
     };
     loadData();
   }, [user]);
+
+  useEffect(() => {
+    if (!user) {
+      initialRefreshRef.current = { userId: null, inFlight: false };
+    }
+  }, [user]);
+
+  // Refresh market prices + exchange rates once after initial load
+  useEffect(() => {
+    if (!user || isLoading) {
+      return;
+    }
+
+    if (initialRefreshRef.current.userId === user.id || initialRefreshRef.current.inFlight) {
+      return;
+    }
+
+    initialRefreshRef.current.inFlight = true;
+
+    const refreshMarketData = async () => {
+      const stockHoldings = data.stockHoldings.filter(holding => holding.stockType !== 'Cash');
+      const cryptoHoldings = data.cryptoHoldings;
+
+      if (stockHoldings.length === 0 && cryptoHoldings.length === 0) {
+        return;
+      }
+
+      const [usdToMyr, hkdToMyr] = await Promise.all([
+        getUSDToMYRRate(),
+        getHKDToMYRRate(),
+      ]);
+
+      const stockSymbols = Array.from(new Set(stockHoldings.map(h => h.code.toUpperCase())));
+      const cryptoSymbols = Array.from(new Set(cryptoHoldings.map(h => h.symbol.toUpperCase())));
+
+      const [stockPrices, cryptoPrices] = await Promise.all([
+        stockSymbols.length > 0 ? getStockPrices(stockSymbols) : Promise.resolve(new Map<string, number>()),
+        cryptoSymbols.length > 0 ? getCryptoPrices(cryptoSymbols) : Promise.resolve(new Map<string, number>()),
+      ]);
+
+      setData(prev => ({
+        ...prev,
+        stockHoldings: prev.stockHoldings.map(holding => {
+          if (holding.stockType === 'Cash') {
+            return holding;
+          }
+
+          const price = stockPrices.get(holding.code.toUpperCase());
+          const exchangeRate = holding.currency === 'USD'
+            ? usdToMyr
+            : holding.currency === 'HKD'
+              ? hkdToMyr
+              : undefined;
+
+          if (price === undefined && exchangeRate === undefined) {
+            return holding;
+          }
+
+          return {
+            ...holding,
+            marketPrice: price ?? holding.marketPrice,
+            lastUpdated: price ? new Date().toISOString() : holding.lastUpdated,
+            exchangeRate: exchangeRate ?? holding.exchangeRate,
+          };
+        }),
+        cryptoHoldings: prev.cryptoHoldings.map(holding => {
+          const price = cryptoPrices.get(holding.symbol.toUpperCase());
+          if (price === undefined && !usdToMyr) {
+            return holding;
+          }
+
+          return {
+            ...holding,
+            marketPrice: price ?? holding.marketPrice,
+            lastUpdated: price ? new Date().toISOString() : holding.lastUpdated,
+            exchangeRate: usdToMyr || holding.exchangeRate,
+          };
+        }),
+      }));
+    };
+
+    refreshMarketData()
+      .catch(error => {
+        console.error('Error refreshing market data on init:', error);
+      })
+      .finally(() => {
+        initialRefreshRef.current.userId = user.id;
+        initialRefreshRef.current.inFlight = false;
+      });
+  }, [data.cryptoHoldings, data.stockHoldings, isLoading, user]);
 
   // Debounced save when data changes
   useEffect(() => {
@@ -282,6 +378,26 @@ export const FinancialDataProvider: React.FC<{ children: ReactNode }> = ({ child
     }));
   };
 
+  const updateStockPrices = (prices: Map<string, number>) => {
+    if (prices.size === 0) {
+      return;
+    }
+
+    const timestamp = new Date().toISOString();
+    setData(prev => ({
+      ...prev,
+      stockHoldings: prev.stockHoldings.map(h => {
+        if (h.stockType === 'Cash') {
+          return h;
+        }
+        const price = prices.get(h.code.toUpperCase());
+        return price === undefined
+          ? h
+          : { ...h, marketPrice: price, lastUpdated: timestamp };
+      }),
+    }));
+  };
+
   // Crypto Holdings
   const addCryptoHolding = (holding: Omit<CryptoHolding, 'id'>) => {
     setData(prev => ({
@@ -310,6 +426,23 @@ export const FinancialDataProvider: React.FC<{ children: ReactNode }> = ({ child
       cryptoHoldings: prev.cryptoHoldings.map(h => 
         h.id === id ? { ...h, marketPrice: price, lastUpdated: new Date().toISOString() } : h
       ),
+    }));
+  };
+
+  const updateCryptoPrices = (prices: Map<string, number>) => {
+    if (prices.size === 0) {
+      return;
+    }
+
+    const timestamp = new Date().toISOString();
+    setData(prev => ({
+      ...prev,
+      cryptoHoldings: prev.cryptoHoldings.map(h => {
+        const price = prices.get(h.symbol.toUpperCase());
+        return price === undefined
+          ? h
+          : { ...h, marketPrice: price, lastUpdated: timestamp };
+      }),
     }));
   };
 
@@ -387,7 +520,8 @@ export const FinancialDataProvider: React.FC<{ children: ReactNode }> = ({ child
         justifyContent: 'center', 
         alignItems: 'center', 
         height: '100vh',
-        color: 'var(--text-primary)'
+        color: 'var(--text-primary)',
+        background: 'var(--bg-primary)'
       }}>
         Loading...
       </div>
@@ -417,10 +551,12 @@ export const FinancialDataProvider: React.FC<{ children: ReactNode }> = ({ child
         updateStockHolding,
         deleteStockHolding,
         updateStockPrice,
+        updateStockPrices,
         addCryptoHolding,
         updateCryptoHolding,
         deleteCryptoHolding,
         updateCryptoPrice,
+        updateCryptoPrices,
         addTradingAccount,
         updateTradingAccount,
         deleteTradingAccount,
