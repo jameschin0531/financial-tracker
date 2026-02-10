@@ -1,253 +1,98 @@
-// Free stock price API using Alpha Vantage (free tier: 5 calls/min, 500 calls/day)
-// Alternative: Yahoo Finance via proxy (no API key needed)
+export type StockQuoteSource = "yahoo" | "twelvedata" | "alphavantage";
 
-// Store API key from config
-let cachedApiKey: string | null = null;
-
-export const setAlphaVantageApiKey = (apiKey: string) => {
-  cachedApiKey = apiKey;
-};
-
-// Get API key from cache or fallback to demo key
-const getAlphaVantageApiKey = (): string => {
-  if (cachedApiKey && cachedApiKey.trim() !== '' && cachedApiKey !== 'your_api_key_here') {
-    return cachedApiKey;
-  }
-  
-  // Legacy fallback: check window.__API_CONFIG__ (for backwards compatibility)
-  if (typeof window !== 'undefined' && window.__API_CONFIG__) {
-    const apiKey = window.__API_CONFIG__.ALPHA_VANTAGE_API_KEY;
-    if (apiKey && apiKey !== 'your_api_key_here' && apiKey.trim() !== '') {
-      return apiKey;
-    }
-  }
-  
-  // Fallback to demo key for development (has rate limits)
-  return 'EO4PFYMJVVHLWDQL';
-};
-
-const ALPHA_VANTAGE_BASE = 'https://www.alphavantage.co/query';
-const YAHOO_QUOTE_BASE = 'https://query1.finance.yahoo.com/v7/finance/quote?symbols=';
-
-interface AlphaVantageResponse {
-  'Global Quote'?: {
-    '01. symbol': string;
-    '05. price': string;
-    '08. previous close': string;
-    '09. change': string;
-    '10. change percent': string;
-  };
-  'Error Message'?: string;
-  'Note'?: string;
+export interface StockPriceRefreshMeta {
+  prices: Map<string, number>;
+  sourceBySymbol: Map<string, StockQuoteSource>;
+  missing: string[];
+  durationMs: number;
 }
 
-// Cache for stock prices
-const priceCache: Map<string, { price: number; timestamp: number }> = new Map();
-const CACHE_DURATION = 300000; // 5 minutes cache
+interface StockPriceApiResponse {
+  prices: Record<string, number>;
+  sourceBySymbol: Record<string, StockQuoteSource>;
+  missing: string[];
+  durationMs: number;
+}
+
+const SYMBOL_PATTERN = /^[A-Z0-9.-]+$/;
+
+// Kept for backwards compatibility with existing auth/config flow.
+export const setAlphaVantageApiKey = (_apiKey: string): void => {
+  // No-op after moving quote fetching to server-side provider chain.
+};
+
+const normalizeSymbols = (symbols: string[]): string[] => {
+  const deduped = new Set<string>();
+  for (const rawSymbol of symbols) {
+    const symbol = rawSymbol.trim().toUpperCase();
+    if (!symbol || !SYMBOL_PATTERN.test(symbol)) {
+      continue;
+    }
+    deduped.add(symbol);
+  }
+
+  return Array.from(deduped);
+};
+
+const normalizePrices = (prices: Record<string, number>): Map<string, number> => {
+  const mappedPrices = new Map<string, number>();
+  for (const [rawSymbol, rawPrice] of Object.entries(prices)) {
+    const symbol = rawSymbol.toUpperCase();
+    if (!SYMBOL_PATTERN.test(symbol) || !Number.isFinite(rawPrice) || rawPrice <= 0) {
+      continue;
+    }
+    mappedPrices.set(symbol, rawPrice);
+  }
+  return mappedPrices;
+};
+
+const normalizeSources = (
+  sourceBySymbol: Record<string, StockQuoteSource>,
+): Map<string, StockQuoteSource> => {
+  const mappedSources = new Map<string, StockQuoteSource>();
+  for (const [rawSymbol, source] of Object.entries(sourceBySymbol)) {
+    const symbol = rawSymbol.toUpperCase();
+    if (!SYMBOL_PATTERN.test(symbol)) {
+      continue;
+    }
+    mappedSources.set(symbol, source);
+  }
+  return mappedSources;
+};
+
+export const getStockPricesWithMeta = async (symbols: string[]): Promise<StockPriceRefreshMeta> => {
+  const normalizedSymbols = normalizeSymbols(symbols);
+  if (normalizedSymbols.length === 0) {
+    return {
+      prices: new Map<string, number>(),
+      sourceBySymbol: new Map<string, StockQuoteSource>(),
+      missing: [],
+      durationMs: 0,
+    };
+  }
+
+  const query = encodeURIComponent(normalizedSymbols.join(","));
+  const response = await fetch(`/api/stock-prices?symbols=${query}`);
+  if (!response.ok) {
+    throw new Error(`Stock quote request failed with status ${response.status}`);
+  }
+
+  const data = (await response.json()) as Partial<StockPriceApiResponse>;
+  return {
+    prices: normalizePrices(data.prices ?? {}),
+    sourceBySymbol: normalizeSources(data.sourceBySymbol ?? {}),
+    missing: normalizeSymbols(Array.isArray(data.missing) ? data.missing : []),
+    durationMs: Number.isFinite(data.durationMs) ? Number(data.durationMs) : 0,
+  };
+};
+
+export const getStockPrices = async (symbols: string[]): Promise<Map<string, number>> => {
+  const result = await getStockPricesWithMeta(symbols);
+  return result.prices;
+};
 
 export const getStockPrice = async (symbol: string): Promise<number | null> => {
-  const cacheKey = symbol.toUpperCase();
-  const now = Date.now();
-  
-  // Check cache first
-  const cached = priceCache.get(cacheKey);
-  if (cached && (now - cached.timestamp) < CACHE_DURATION) {
-    return cached.price;
-  }
-  
-  try {
-    // Try Alpha Vantage first
-    const apiKey = getAlphaVantageApiKey();
-    if (!apiKey) {
-      // No API key configured, skip to Yahoo Finance fallback
-      return await getStockPriceYahoo(symbol);
-    }
-    
-    const url = `${ALPHA_VANTAGE_BASE}?function=GLOBAL_QUOTE&symbol=${cacheKey}&apikey=${apiKey}`;
-    const response = await fetch(url);
-    
-    if (!response.ok) {
-      throw new Error('API request failed');
-    }
-    
-    const data: AlphaVantageResponse = await response.json();
-    
-    if (data['Error Message']) {
-      console.error('Alpha Vantage error:', data['Error Message']);
-      // Fallback to Yahoo Finance
-      return await getStockPriceYahoo(symbol);
-    }
-    
-    if (data['Note']) {
-      // Rate limit hit, use cache or fallback
-      if (cached) {
-        return cached.price;
-      }
-      return await getStockPriceYahoo(symbol);
-    }
-    
-    if (data['Global Quote'] && data['Global Quote']['05. price']) {
-      const price = parseFloat(data['Global Quote']['05. price']);
-      if (price > 0) {
-        priceCache.set(cacheKey, { price, timestamp: now });
-        return price;
-      }
-    }
-    
-    // Fallback to Yahoo Finance
-    return await getStockPriceYahoo(symbol);
-  } catch (error) {
-    console.error('Error fetching stock price from Alpha Vantage:', error);
-    // Fallback to Yahoo Finance
-    return await getStockPriceYahoo(symbol);
-  }
+  const result = await getStockPricesWithMeta([symbol]);
+  const normalizedSymbol = symbol.trim().toUpperCase();
+  return result.prices.get(normalizedSymbol) ?? null;
 };
-
-// Fallback: Yahoo Finance via CORS proxy (no API key needed)
-const getStockPriceYahoo = async (symbol: string): Promise<number | null> => {
-  try {
-    const symbolUpper = symbol.toUpperCase();
-    console.log(`Fetching stock price for ${symbolUpper} from Yahoo Finance`);
-    
-    // Try direct access first (may work in some browsers)
-    let url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbolUpper}?interval=1d&range=1d`;
-    
-    try {
-      const response = await fetch(url);
-      if (response.ok) {
-        const data = await response.json();
-        
-        if (data.chart?.result?.[0]?.meta?.regularMarketPrice) {
-          const price = data.chart.result[0].meta.regularMarketPrice;
-          if (price > 0) {
-            const cacheKey = symbolUpper;
-            priceCache.set(cacheKey, { price, timestamp: Date.now() });
-            console.log(`Successfully fetched price for ${symbolUpper} from Yahoo Finance: ${price}`);
-            return price;
-          }
-        }
-      }
-    } catch (corsError) {
-      // CORS error, try alternative approach
-      console.log('Direct Yahoo Finance access failed (CORS), trying proxy method');
-    }
-    
-    // Alternative: Use a public CORS proxy (for development only)
-    // In production, use your own backend or API key
-    const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://query1.finance.yahoo.com/v8/finance/chart/${symbolUpper}?interval=1d&range=1d`)}`;
-    
-    console.log(`Trying Yahoo Finance via proxy for ${symbolUpper}`);
-    const response = await fetch(proxyUrl);
-    if (!response.ok) {
-      console.error(`Yahoo Finance proxy request failed with status ${response.status}`);
-      throw new Error('Yahoo Finance request failed');
-    }
-    
-    const data = await response.json();
-    
-    if (data.chart?.result?.[0]?.meta?.regularMarketPrice) {
-      const price = data.chart.result[0].meta.regularMarketPrice;
-      if (price > 0) {
-        const cacheKey = symbolUpper;
-        priceCache.set(cacheKey, { price, timestamp: Date.now() });
-        console.log(`Successfully fetched price for ${symbolUpper} from Yahoo Finance (via proxy): ${price}`);
-        return price;
-      }
-    }
-    
-    console.warn(`No valid price data found for ${symbolUpper} from Yahoo Finance`);
-    return null;
-  } catch (error) {
-    console.error(`Error fetching stock price from Yahoo Finance for ${symbol}:`, error);
-    return null;
-  }
-};
-
-const getStockPricesYahooBatch = async (symbols: string[]): Promise<Map<string, number>> => {
-  const prices = new Map<string, number>();
-  if (symbols.length === 0) {
-    return prices;
-  }
-
-  const symbolList = symbols.map(symbol => symbol.toUpperCase()).join(',');
-  const baseUrl = `${YAHOO_QUOTE_BASE}${encodeURIComponent(symbolList)}`;
-
-  const fetchBatch = async (url: string): Promise<boolean> => {
-    const response = await fetch(url);
-    if (!response.ok) {
-      return false;
-    }
-
-    const data = await response.json();
-    const results = data?.quoteResponse?.result;
-    if (!Array.isArray(results)) {
-      return false;
-    }
-
-    results.forEach((item: { symbol?: string; regularMarketPrice?: number }) => {
-      const symbol = item.symbol?.toUpperCase();
-      const price = item.regularMarketPrice;
-      if (symbol && typeof price === 'number' && price > 0) {
-        prices.set(symbol, price);
-        priceCache.set(symbol, { price, timestamp: Date.now() });
-      }
-    });
-
-    return prices.size > 0;
-  };
-
-  try {
-    const ok = await fetchBatch(baseUrl);
-    if (ok) {
-      return prices;
-    }
-  } catch (error) {
-    console.warn('Yahoo Finance batch request failed, trying proxy', error);
-  }
-
-  try {
-    const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(baseUrl)}`;
-    await fetchBatch(proxyUrl);
-  } catch (error) {
-    console.error('Yahoo Finance batch proxy failed:', error);
-  }
-
-  return prices;
-};
-
-// Batch fetch multiple stock prices
-export const getStockPrices = async (symbols: string[]): Promise<Map<string, number>> => {
-  const prices = new Map<string, number>();
-  const uniqueSymbols = Array.from(new Set(symbols.map(symbol => symbol.toUpperCase()).filter(Boolean)));
-  if (uniqueSymbols.length === 0) {
-    return prices;
-  }
-
-  const batchPrices = await getStockPricesYahooBatch(uniqueSymbols);
-  batchPrices.forEach((price, symbol) => {
-    prices.set(symbol, price);
-  });
-
-  const missingSymbols = uniqueSymbols.filter(symbol => !prices.has(symbol));
-  if (missingSymbols.length === 0) {
-    return prices;
-  }
-
-  const concurrency = Math.min(3, missingSymbols.length);
-  let currentIndex = 0;
-
-  const workers = new Array(concurrency).fill(null).map(async () => {
-    while (currentIndex < missingSymbols.length) {
-      const symbol = missingSymbols[currentIndex];
-      currentIndex += 1;
-      const price = await getStockPrice(symbol);
-      if (price !== null) {
-        prices.set(symbol.toUpperCase(), price);
-      }
-    }
-  });
-
-  await Promise.all(workers);
-  return prices;
-};
-
