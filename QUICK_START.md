@@ -1,4 +1,4 @@
-# Quick Start Guide
+﻿# Quick Start Guide
 
 Get your Financial Tracker up and running with Supabase authentication and cloud storage.
 
@@ -40,17 +40,17 @@ This creates the `profiles` and `financial_data` tables with Row Level Security.
 4. Create OAuth 2.0 credentials (Web application)
 5. Add authorized redirect URI: `https://YOUR-PROJECT.supabase.co/auth/v1/callback`
 6. Copy Client ID and Client Secret
-7. In Supabase: **Authentication** → **Providers** → **Google** → Enable and paste credentials
+7. In Supabase: **Authentication** â†’ **Providers** â†’ **Google** â†’ Enable and paste credentials
 
 #### GitHub OAuth (Alternative)
 1. Go to [GitHub Developer Settings](https://github.com/settings/developers)
 2. Click **New OAuth App**
 3. Set callback URL: `https://YOUR-PROJECT.supabase.co/auth/v1/callback`
 4. Copy Client ID and generate Client Secret
-5. In Supabase: **Authentication** → **Providers** → **GitHub** → Enable and paste credentials
+5. In Supabase: **Authentication** â†’ **Providers** â†’ **GitHub** â†’ Enable and paste credentials
 
 ### Get API Credentials
-1. In Supabase dashboard, go to **Settings** → **API**
+1. In Supabase dashboard, go to **Settings** â†’ **API**
 2. Copy **Project URL** (e.g., `https://xxxxx.supabase.co`)
 3. Copy **anon public** key
 
@@ -67,13 +67,14 @@ Edit `.env` and add your credentials:
 ```env
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_ANON_KEY=your-anon-key-here
-ALPHA_VANTAGE_API_KEY=your-api-key  # Optional but recommended
+ALPHA_VANTAGE_API_KEY=your-api-key  # Optional fallback
+TWELVE_DATA_API_KEY=your-twelve-data-key # Optional but recommended for stock fallback reliability
 ```
 
 ## 4. Update Supabase Redirect URLs
 
 In Supabase dashboard:
-1. Go to **Authentication** → **URL Configuration**
+1. Go to **Authentication** â†’ **URL Configuration**
 2. Set **Site URL**: `http://localhost:3000`
 3. Add **Redirect URLs**:
    ```
@@ -107,12 +108,13 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
    - `SUPABASE_URL`
    - `SUPABASE_ANON_KEY`
    - `ALPHA_VANTAGE_API_KEY` (optional)
+   - `TWELVE_DATA_API_KEY` (optional, recommended)
 5. Click **Deploy**
 
 ### Update Supabase URLs
 After deployment:
 1. Copy your Vercel URL (e.g., `https://your-app.vercel.app`)
-2. In Supabase: **Authentication** → **URL Configuration**
+2. In Supabase: **Authentication** â†’ **URL Configuration**
 3. Update **Site URL** to your Vercel URL
 4. Ensure Vercel URL is in **Redirect URLs** list
 
@@ -135,6 +137,13 @@ After deployment:
 - Run `bun install` to ensure all dependencies are installed
 - Check that `@supabase/supabase-js` is in `package.json`
 
+### Stock/Crypto prices not updating
+- Check your internet connection
+- Verify API services are available (Yahoo, Twelve Data, Alpha Vantage, CoinGecko)
+- Check browser console and Bun server logs for API errors
+- Expected behavior: stock refresh can return partial results; missing symbols keep previous prices
+- Add `TWELVE_DATA_API_KEY` and `ALPHA_VANTAGE_API_KEY` to improve fallback coverage
+
 ## Next Steps
 
 - Read `DEPLOYMENT.md` for detailed deployment guide
@@ -144,13 +153,18 @@ After deployment:
 ## Getting Help
 
 - Check the browser console for errors
-- Check Supabase logs: Dashboard → **Logs**
-- Check Vercel logs: Dashboard → **Deployments** → Select deployment → **Logs**
+- Check Supabase logs: Dashboard â†’ **Logs**
+- Check Vercel logs: Dashboard â†’ **Deployments** â†’ Select deployment â†’ **Logs**
 - Review `DEPLOYMENT.md` troubleshooting section
 
 ## API Keys (Optional)
 
-### Alpha Vantage (Stock Prices)
+### Twelve Data (Recommended Stock Fallback)
+1. Get API key: [twelvedata.com/pricing](https://twelvedata.com/pricing)
+2. Add to `.env`: `TWELVE_DATA_API_KEY=your-key`
+3. Restart dev server
+
+### Alpha Vantage (Stock Prices Fallback)
 1. Get free API key: [alphavantage.co](https://www.alphavantage.co/support/#api-key)
 2. Add to `.env`: `ALPHA_VANTAGE_API_KEY=your-key`
 3. Restart dev server
@@ -180,5 +194,6 @@ After deployment:
 - Automatic cloud sync
 - Row Level Security for privacy
 
-Enjoy your secure, cloud-synced Financial Tracker! 🚀
+Enjoy your secure, cloud-synced Financial Tracker! ðŸš€
+
 

@@ -1,8 +1,8 @@
-# Financial Tracker
+﻿# Financial Tracker
 
 A comprehensive, user-friendly financial web application that allows you to track and manage your complete financial portfolio without requiring a login. The application features a modern glassmorphism UI design, responsive layout, comprehensive dashboard with key financial metrics, real-time stock and crypto price tracking, and the ability to switch between eye-protective light and dark themes.
 
-**🖥️ Desktop App Available**: This application can also be run as a desktop app! See [README-ELECTRON.md](./README-ELECTRON.md) for details.
+**ðŸ–¥ï¸ Desktop App Available**: This application can also be run as a desktop app! See [README-ELECTRON.md](./README-ELECTRON.md) for details.
 
 ## Features
 
@@ -91,6 +91,9 @@ Edit `.env` and add your API keys:
 # Get your free API key from: https://www.alphavantage.co/support/#api-key
 ALPHA_VANTAGE_API_KEY=your_api_key_here
 
+# Optional: Twelve Data API Key (recommended for stock fallback reliability)
+# TWELVE_DATA_API_KEY=your_api_key_here
+
 # Optional: CoinGecko API Key (for higher rate limits)
 # Get your API key from: https://www.coingecko.com/en/api
 # COINGECKO_API_KEY=your_api_key_here
@@ -99,7 +102,7 @@ ALPHA_VANTAGE_API_KEY=your_api_key_here
 # EXCHANGE_RATE_API_KEY=your_api_key_here
 ```
 
-**Note**: The application will work without API keys using free tiers and fallback services, but you may encounter rate limits. Adding your own API keys is recommended for production use.
+**Note**: Stock quotes are fetched via a server-side provider chain: Yahoo batch as primary, Twelve Data as preferred fallback, and Alpha Vantage as last fallback. The app works without optional keys, but adding TWELVE_DATA_API_KEY and ALPHA_VANTAGE_API_KEY improves reliability under rate limits.
 
 ## Running the Application
 
@@ -128,12 +131,12 @@ The built files will be in the `dist` directory.
 ### Navigation
 
 The application features a sidebar navigation with the following sections:
-- **📊 Dashboard**: Overview of your financial status
-- **💰 Assets**: Manage your assets (current and fixed)
-- **💳 Liabilities**: Track your debts and loans
-- **📈 Monthly Cash Flow**: View income and expenses in a table format
-- **📈 Stock Tracker**: Manage your stock portfolio
-- **₿ Crypto Tracker**: Manage your cryptocurrency holdings
+- **ðŸ“Š Dashboard**: Overview of your financial status
+- **ðŸ’° Assets**: Manage your assets (current and fixed)
+- **ðŸ’³ Liabilities**: Track your debts and loans
+- **ðŸ“ˆ Monthly Cash Flow**: View income and expenses in a table format
+- **ðŸ“ˆ Stock Tracker**: Manage your stock portfolio
+- **â‚¿ Crypto Tracker**: Manage your cryptocurrency holdings
 
 ### Adding Financial Records
 
@@ -204,7 +207,7 @@ The application features a sidebar navigation with the following sections:
    - **Date**: Purchase date
 3. Click "Add Holding"
 
-**Note**: The app automatically fetches real-time stock prices from Alpha Vantage API (with Yahoo Finance fallback).
+**Note**: The app calls a local /api/stock-prices endpoint that uses a provider chain: Yahoo batch first, Twelve Data fallback (when configured), and Alpha Vantage last.
 
 #### Features
 - **Grouped Holdings**: Holdings with the same stock code are grouped together
@@ -295,7 +298,7 @@ The Monthly Cash Flow page displays a comprehensive table showing:
 
 ### Theme Switching
 
-Click the theme toggle button (🌙/☀️) in the header to switch between:
+Click the theme toggle button (ðŸŒ™/â˜€ï¸) in the header to switch between:
 - **Light Theme**: Eye-protective warm colors designed to reduce eye strain
 - **Dark Theme**: Near-black dark mode for low-light environments
 
@@ -327,7 +330,7 @@ Financial data is now stored securely in Supabase (PostgreSQL) with user authent
 The application uses the following free APIs:
 
 - **Exchange Rates**: [exchangerate-api.com](https://www.exchangerate-api.com/) for USD-to-MYR and HKD-to-MYR conversion
-- **Stock Prices**: [Alpha Vantage](https://www.alphavantage.co/) with [Yahoo Finance](https://finance.yahoo.com/) fallback
+- **Stock Prices**: Local server aggregator (/api/stock-prices) using Yahoo batch primary, Twelve Data fallback, and Alpha Vantage fallback
 - **Crypto Prices**: [CoinGecko API](https://www.coingecko.com/en/api)
 
 **Note**: API rate limits may apply. Prices are cached to reduce API calls.
@@ -341,15 +344,15 @@ Click the "Edit" or "Delete" button next to any record in the list. All records 
 ### How is monthly income calculated?
 
 Income is converted to monthly amounts based on frequency:
-- Weekly: Amount × 4.33
-- Bi-weekly: Amount × 2.17
+- Weekly: Amount Ã— 4.33
+- Bi-weekly: Amount Ã— 2.17
 - Monthly: Amount (no conversion)
-- Yearly: Amount ÷ 12
+- Yearly: Amount Ã· 12
 - One-time: Not included in monthly calculations
 
 ### How are stock prices updated?
 
-Stock prices are fetched automatically from Alpha Vantage API (with Yahoo Finance fallback) when you view the Stock Tracker page. Prices are cached to reduce API calls.
+Stock prices are fetched through the local /api/stock-prices endpoint. The server tries Yahoo batch first, then Twelve Data (if TWELVE_DATA_API_KEY is set), then Alpha Vantage. Partial results are returned when some symbols fail, and cached values are reused on provider timeouts.
 
 ### How are crypto prices updated?
 
@@ -409,9 +412,10 @@ If stock or crypto price APIs are unavailable, the application will continue to 
 
 ### Stock/Crypto prices not updating
 - Check your internet connection
-- Verify API services are available (Alpha Vantage, CoinGecko)
-- Check browser console for API errors
-- Prices are cached - wait a few minutes and refresh
+- Verify API services are available (Yahoo, Twelve Data, Alpha Vantage, CoinGecko)
+- Check browser console and server logs for API errors
+- Expected behavior under provider/rate-limit issues: partial stock updates may still succeed and missing symbols keep previous prices
+- Configure TWELVE_DATA_API_KEY and ALPHA_VANTAGE_API_KEY for better fallback coverage
 
 ### Theme not switching
 - Clear your browser cache and localStorage
@@ -441,26 +445,26 @@ If stock or crypto price APIs are unavailable, the application will continue to 
 
 ```
 ai-test/
-├── data/                    # Data storage (gitignored)
-│   └── financial-data.json  # Financial data file
-├── public/                  # Static files
-│   └── index.html          # HTML entry point
-├── src/
-│   ├── components/         # React components
-│   │   ├── Crypto/        # Crypto tracker components
-│   │   ├── Dashboard/    # Dashboard components
-│   │   ├── Export/        # Export functionality
-│   │   ├── Forms/         # Form components
-│   │   ├── Layout/        # Layout components
-│   │   └── Stocks/        # Stock tracker components
-│   ├── context/           # React context providers
-│   ├── pages/             # Page components
-│   ├── services/          # Business logic and API services
-│   ├── types/             # TypeScript type definitions
-│   └── utils/             # Utility functions
-├── server.ts              # Bun server with API endpoints
-├── package.json           # Dependencies and scripts
-└── tsconfig.json          # TypeScript configuration
+â”œâ”€â”€ data/                    # Data storage (gitignored)
+â”‚   â””â”€â”€ financial-data.json  # Financial data file
+â”œâ”€â”€ public/                  # Static files
+â”‚   â””â”€â”€ index.html          # HTML entry point
+â”œâ”€â”€ src/
+â”‚   â”œâ”€â”€ components/         # React components
+â”‚   â”‚   â”œâ”€â”€ Crypto/        # Crypto tracker components
+â”‚   â”‚   â”œâ”€â”€ Dashboard/    # Dashboard components
+â”‚   â”‚   â”œâ”€â”€ Export/        # Export functionality
+â”‚   â”‚   â”œâ”€â”€ Forms/         # Form components
+â”‚   â”‚   â”œâ”€â”€ Layout/        # Layout components
+â”‚   â”‚   â””â”€â”€ Stocks/        # Stock tracker components
+â”‚   â”œâ”€â”€ context/           # React context providers
+â”‚   â”œâ”€â”€ pages/             # Page components
+â”‚   â”œâ”€â”€ services/          # Business logic and API services
+â”‚   â”œâ”€â”€ types/             # TypeScript type definitions
+â”‚   â””â”€â”€ utils/             # Utility functions
+â”œâ”€â”€ server.ts              # Bun server with API endpoints
+â”œâ”€â”€ package.json           # Dependencies and scripts
+â””â”€â”€ tsconfig.json          # TypeScript configuration
 ```
 
 ### API Endpoints
@@ -500,3 +504,4 @@ For issues or questions:
 ---
 
 **Note**: This application stores data locally in the `data/financial-data.json` file. Always export your data regularly as a backup, especially before making major changes or switching devices.
+
