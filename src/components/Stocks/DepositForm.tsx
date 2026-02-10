@@ -110,7 +110,7 @@ const DepositForm: React.FC<DepositFormProps> = ({ deposit, onCancel, accounts }
           <label htmlFor="deposit-amount" className={styles.label}>
             Amount (MYR)
             <span className={styles.tooltip} title="Enter the deposit amount in Malaysian Ringgit">
-              ℹ️
+              i
             </span>
           </label>
           <input

@@ -187,7 +187,7 @@ const LiabilityForm: React.FC<LiabilityFormProps> = ({ editingLiability, onCance
           <label htmlFor="liability-name" className={styles.label}>
             Liability Name
             <span className={styles.tooltip} title="Enter the name of your liability (e.g., Credit Card, Mortgage)">
-              ℹ️
+              i
             </span>
           </label>
           <input
@@ -205,7 +205,7 @@ const LiabilityForm: React.FC<LiabilityFormProps> = ({ editingLiability, onCance
           <label htmlFor="liability-category" className={styles.label}>
             Category
             <span className={styles.tooltip} title="Select an existing category or add a new one">
-              ℹ️
+              i
             </span>
           </label>
           {!showNewCategory ? (
@@ -265,7 +265,7 @@ const LiabilityForm: React.FC<LiabilityFormProps> = ({ editingLiability, onCance
           <label htmlFor="liability-currency" className={styles.label}>
             Currency
             <span className={styles.tooltip} title="Select the currency for this liability">
-              ℹ️
+              i
             </span>
           </label>
           <select
@@ -296,7 +296,7 @@ const LiabilityForm: React.FC<LiabilityFormProps> = ({ editingLiability, onCance
           <label htmlFor="liability-amount" className={styles.label}>
             Amount Owed ({currency === 'MYR' ? 'MYR' : 'USD'})
             <span className={styles.tooltip} title="Enter the total amount you owe for this liability">
-              ℹ️
+              i
             </span>
           </label>
           <input
@@ -316,7 +316,7 @@ const LiabilityForm: React.FC<LiabilityFormProps> = ({ editingLiability, onCance
           <label htmlFor="liability-interest" className={styles.label}>
             Interest Rate (%)
             <span className={styles.tooltip} title="Enter the annual interest rate (optional)">
-              ℹ️
+              i
             </span>
           </label>
           <input
@@ -337,7 +337,7 @@ const LiabilityForm: React.FC<LiabilityFormProps> = ({ editingLiability, onCance
           <label htmlFor="liability-date" className={styles.label}>
             Date
             <span className={styles.tooltip} title="Select the date when this liability was recorded">
-              ℹ️
+              i
             </span>
           </label>
           <input

@@ -55,7 +55,21 @@ const ExportButton: React.FC = () => {
         aria-expanded={isOpen}
       >
         Export
-        <span className={styles.arrow}>{isOpen ? '▲' : '▼'}</span>
+        <span className={styles.arrow} aria-hidden="true">
+          <svg
+            viewBox="0 0 24 24"
+            className={`${styles.arrowIcon} ${isOpen ? styles.arrowUp : ''}`}
+          >
+            <path
+              d="M6 9l6 6 6-6"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </span>
       </button>
       {isOpen && (
         <div className={styles.dropdown}>

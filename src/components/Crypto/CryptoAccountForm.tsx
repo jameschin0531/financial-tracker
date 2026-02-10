@@ -67,7 +67,7 @@ const CryptoAccountForm: React.FC<CryptoAccountFormProps> = ({ account, onCancel
           <label htmlFor="crypto-account-name" className={styles.label}>
             Account/Wallet Name
             <span className={styles.tooltip} title="Enter the account or wallet name (e.g., Binance, Coinbase, MetaMask)">
-              ℹ️
+              i
             </span>
           </label>
           <input

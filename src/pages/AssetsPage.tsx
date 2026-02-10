@@ -100,7 +100,7 @@ const AssetsPage: React.FC = () => {
                     <div className={styles.listItemContent}>
                       <h3 className={styles.listItemTitle}>{asset.name}</h3>
                       <p className={styles.listItemSubtitle}>
-                        {asset.category} • {asset.assetType === 'current' ? 'Current' : 'Fixed'} • {asset.currency}
+                        {asset.category} | {asset.assetType === 'current' ? 'Current' : 'Fixed'} | {asset.currency}
                       </p>
                       <p className={styles.listItemDate}>
                         {new Date(asset.date).toLocaleDateString()}
@@ -118,7 +118,7 @@ const AssetsPage: React.FC = () => {
                         aria-label="Edit asset"
                         title="Edit asset"
                       >
-                        ✏️
+                        Edit
                       </button>
                       <button
                         className={styles.deleteButton}
@@ -126,7 +126,7 @@ const AssetsPage: React.FC = () => {
                         aria-label="Delete asset"
                         title="Delete asset"
                       >
-                        🗑️
+                        Delete
                       </button>
                     </div>
                   </div>

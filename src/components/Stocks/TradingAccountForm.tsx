@@ -68,7 +68,7 @@ const TradingAccountForm: React.FC<TradingAccountFormProps> = ({ account, onCanc
           <label htmlFor="account-name" className={styles.label}>
             Account Name
             <span className={styles.tooltip} title="Enter the account name (e.g., etoro, tiger, futu, webull)">
-              ℹ️
+              i
             </span>
           </label>
           <input

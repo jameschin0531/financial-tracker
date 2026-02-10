@@ -134,7 +134,7 @@ const StockTrackerPage: React.FC = () => {
             onClick={handleUpdatePrices}
             disabled={loadingPrices || data.stockHoldings.length === 0}
           >
-            {loadingPrices ? 'Updating...' : '🔄 Update Prices'}
+            {loadingPrices ? 'Updating...' : 'Update Prices'}
           </button>
         </div>
         <div className={styles.portfolioSummary}>
@@ -289,7 +289,7 @@ const StockTrackerPage: React.FC = () => {
                             <td className={styles.expandCell}>
                               {hasMultipleHoldings && (
                                 <span className={styles.expandIcon}>
-                                  {isExpanded ? '▼' : '▶'}
+                                  {isExpanded ? 'v' : '>'}
                                 </span>
                               )}
                             </td>
@@ -373,7 +373,7 @@ const StockTrackerPage: React.FC = () => {
                               <tr key={holding.id} className={styles.subRow}>
                                 <td></td>
                                 <td className={styles.subCodeCell}>
-                                  <span className={styles.subIndicator}>└─</span>
+                                  <span className={styles.subIndicator}>--</span>
                                   {holding.account}
                                 </td>
                                 <td>
@@ -417,7 +417,7 @@ const StockTrackerPage: React.FC = () => {
                                       }}
                                       title="Edit"
                                     >
-                                      ✏️
+                                      Edit
                                     </button>
                                     <button
                                       className={styles.deleteButton}
@@ -429,7 +429,7 @@ const StockTrackerPage: React.FC = () => {
                                       }}
                                       title="Delete"
                                     >
-                                      🗑️
+                                      Delete
                                     </button>
                                   </div>
                                 </td>
@@ -515,7 +515,7 @@ const StockTrackerPage: React.FC = () => {
                               onClick={() => setEditingAccount(account)}
                               title="Edit"
                             >
-                              ✏️
+                              Edit
                             </button>
                             <button
                               className={styles.deleteButton}
@@ -526,7 +526,7 @@ const StockTrackerPage: React.FC = () => {
                               }}
                               title="Delete"
                             >
-                              🗑️
+                              Delete
                             </button>
                           </div>
                         </td>
@@ -593,7 +593,7 @@ const StockTrackerPage: React.FC = () => {
                                 onClick={() => setEditingDeposit(deposit)}
                                 title="Edit"
                               >
-                                ✏️
+                                Edit
                               </button>
                               <button
                                 className={styles.deleteButton}
@@ -604,7 +604,7 @@ const StockTrackerPage: React.FC = () => {
                                 }}
                                 title="Delete"
                               >
-                                🗑️
+                                Delete
                               </button>
                             </div>
                           </td>

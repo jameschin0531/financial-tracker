@@ -140,7 +140,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ editingExpense, onCancel }) =
           <label htmlFor="expense-category" className={styles.label}>
             Category
             <span className={styles.tooltip} title="Select the category that best describes your expense">
-              ℹ️
+              i
             </span>
           </label>
           {!showNewCategory ? (
@@ -202,7 +202,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ editingExpense, onCancel }) =
           <label htmlFor="expense-currency" className={styles.label}>
             Currency
             <span className={styles.tooltip} title="Select the currency for this expense">
-              ℹ️
+              i
             </span>
           </label>
           <select
@@ -233,7 +233,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ editingExpense, onCancel }) =
           <label htmlFor="expense-amount" className={styles.label}>
             Amount ({currency === 'MYR' ? 'MYR' : 'USD'})
             <span className={styles.tooltip} title="Enter the amount spent">
-              ℹ️
+              i
             </span>
           </label>
           <input
@@ -253,7 +253,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ editingExpense, onCancel }) =
           <label htmlFor="expense-date" className={styles.label}>
             Date
             <span className={styles.tooltip} title="Select the date when this expense occurred">
-              ℹ️
+              i
             </span>
           </label>
           <input
@@ -270,7 +270,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ editingExpense, onCancel }) =
           <label htmlFor="expense-description" className={styles.label}>
             Description
             <span className={styles.tooltip} title="Optional: Add a description or note about this expense">
-              ℹ️
+              i
             </span>
           </label>
           <input

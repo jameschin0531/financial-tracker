@@ -46,7 +46,7 @@ const LiabilitiesPage: React.FC = () => {
                     <div className={styles.listItemContent}>
                       <h3 className={styles.listItemTitle}>{liability.name}</h3>
                       <p className={styles.listItemSubtitle}>
-                        {liability.category} • {liability.currency}
+                        {liability.category} | {liability.currency}
                       </p>
                       {liability.interestRate && (
                         <p className={styles.listItemSubtitle}>
@@ -69,7 +69,7 @@ const LiabilitiesPage: React.FC = () => {
                         aria-label="Edit liability"
                         title="Edit liability"
                       >
-                        ✏️
+                        Edit
                       </button>
                       <button
                         className={styles.deleteButton}
@@ -77,7 +77,7 @@ const LiabilitiesPage: React.FC = () => {
                         aria-label="Delete liability"
                         title="Delete liability"
                       >
-                        🗑️
+                        Delete
                       </button>
                     </div>
                   </div>

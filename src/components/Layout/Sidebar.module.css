@@ -1,23 +1,22 @@
 .sidebar {
-  position: fixed;
+  position: relative;
   left: 0;
   top: 0;
+  width: 270px;
   height: 100%;
-  width: 260px;
-  background: var(--gradient-primary), var(--bg-card);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  background: linear-gradient(180deg, rgba(5, 10, 18, 0.96), rgba(5, 10, 18, 0.88));
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
   border-right: 1px solid var(--border-color);
   display: flex;
   flex-direction: column;
-  z-index: 100;
-  box-shadow:
-    2px 0 20px var(--shadow),
-    0 0 0 1px rgba(255, 255, 255, 0.05) inset;
-  transition: transform 0.3s ease;
+  z-index: 12;
+  box-shadow: 12px 0 30px var(--shadow);
   overflow: hidden;
-  box-sizing: border-box;
-  position: relative;
+}
+
+[data-theme='light'] .sidebar {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(245, 248, 252, 0.92));
 }
 
 .sidebar::before {
@@ -25,153 +24,104 @@
   position: absolute;
   top: 0;
   right: 0;
+  bottom: 0;
   width: 1px;
   background: var(--gradient-accent);
-  opacity: 0.3;
+  opacity: 0.5;
 }
 
 .sidebarHeader {
-  padding: 1.5rem 1.25rem;
+  padding: 1.5rem 1.25rem 1.1rem;
   border-bottom: 1px solid var(--border-color);
-  flex-shrink: 0;
 }
 
 .sidebarTitle {
-  font-size: 1.25rem;
+  font-size: 1.15rem;
   font-weight: 700;
-  color: var(--text-primary);
   margin: 0;
-  background: linear-gradient(135deg, var(--accent-color), var(--accent-hover));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: var(--text-primary);
+}
+
+.sidebarSubtitle {
+  margin: 0.38rem 0 0;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-secondary);
 }
 
 .nav {
   flex: 1 1 auto;
-  padding: 1rem 0;
+  padding: 0.8rem 0.75rem;
   overflow-y: auto;
   overflow-x: hidden;
-  width: 100%;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  max-height: 100%;
 }
 
 .nav::-webkit-scrollbar {
   width: 6px;
 }
 
-.nav::-webkit-scrollbar-track {
-  background: transparent;
-}
-
 .nav::-webkit-scrollbar-thumb {
   background: var(--border-color);
-  border-radius: 3px;
-}
-
-.nav::-webkit-scrollbar-thumb:hover {
-  background: var(--accent-color);
+  border-radius: 6px;
 }
 
 .navList {
   list-style: none;
   margin: 0;
   padding: 0;
-  width: 100%;
-  flex: 1 1 auto;
   display: flex;
   flex-direction: column;
-  min-height: 0;
-  justify-content: flex-start;
-}
-
-.navList li {
-  margin: 0;
+  gap: 0.35rem;
 }
 
 .navItem {
   width: 100%;
-  padding: 0.875rem 1.25rem;
-  background: none;
-  border: none;
+  padding: 0.72rem 0.82rem;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
   color: var(--text-primary);
-  font-size: 0.95rem;
+  font-size: 0.92rem;
   font-weight: 500;
   cursor: pointer;
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  gap: 0.68rem;
   text-align: left;
-  position: relative;
-  border-radius: 0 12px 12px 0;
-  margin-right: 0;
-  outline: none;
-  box-sizing: border-box;
-}
-
-.navItem::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 0;
-  height: 60%;
-  background: var(--gradient-accent);
-  border-radius: 0 4px 4px 0;
-  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  opacity: 0;
+  transition: border-color 0.2s ease, background-color 0.2s ease, color 0.2s ease;
 }
 
 .navItem:hover {
   background: var(--gradient-primary), var(--bg-hover);
-  color: var(--accent-color);
-  padding-left: 1.5rem;
-}
-
-.navItem:hover::before {
-  width: 3px;
-  opacity: 1;
-  background: var(--gradient-accent);
-}
-
-.navItem:focus {
-  outline: none;
-  background: var(--bg-hover);
-  color: var(--accent-color);
+  border-color: var(--border-color);
+  color: var(--accent-hover);
 }
 
 .navItem:focus-visible {
   outline: 2px solid var(--accent-color);
-  outline-offset: -2px;
-  border-radius: 0 12px 12px 0;
+  outline-offset: 1px;
 }
 
 .navItem.active {
   background: var(--gradient-primary), var(--bg-hover);
-  color: var(--accent-color);
-  font-weight: 600;
-  padding-left: 1.5rem;
-}
-
-.navItem.active::before {
-  width: 3px;
-  opacity: 1;
-  background: var(--gradient-accent);
-  box-shadow: 0 0 8px var(--accent-glow);
+  border-color: rgba(245, 158, 11, 0.32);
+  color: var(--accent-hover);
+  box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.25) inset;
 }
 
 .navIcon {
-  font-size: 1.25rem;
-  display: flex;
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
+  color: currentColor;
+}
+
+.navIcon svg {
+  width: 20px;
+  height: 20px;
 }
 
 .navLabel {
@@ -181,5 +131,6 @@
 @media (max-width: 768px) {
   .sidebar {
     width: 280px;
+    box-shadow: 16px 0 30px rgba(2, 6, 23, 0.45);
   }
 }

@@ -182,7 +182,7 @@ const AssetForm: React.FC<AssetFormProps> = ({ editingAsset, onCancel }) => {
           <label htmlFor="asset-name" className={styles.label}>
             Asset Name
             <span className={styles.tooltip} title="Enter the name of your asset (e.g., Savings Account, Car, House)">
-              ℹ️
+              i
             </span>
           </label>
           <input
@@ -200,7 +200,7 @@ const AssetForm: React.FC<AssetFormProps> = ({ editingAsset, onCancel }) => {
           <label htmlFor="asset-type" className={styles.label}>
             Asset Type
             <span className={styles.tooltip} title="Current assets are liquid (cash, accounts). Fixed assets are long-term (property, vehicles)">
-              ℹ️
+              i
             </span>
           </label>
           <select
@@ -218,7 +218,7 @@ const AssetForm: React.FC<AssetFormProps> = ({ editingAsset, onCancel }) => {
           <label htmlFor="asset-category" className={styles.label}>
             Category
             <span className={styles.tooltip} title="Select an existing category or add a new one">
-              ℹ️
+              i
             </span>
           </label>
           {!showNewCategory ? (
@@ -278,7 +278,7 @@ const AssetForm: React.FC<AssetFormProps> = ({ editingAsset, onCancel }) => {
           <label htmlFor="asset-currency" className={styles.label}>
             Currency
             <span className={styles.tooltip} title="Select the currency for this asset">
-              ℹ️
+              i
             </span>
           </label>
           <select
@@ -309,7 +309,7 @@ const AssetForm: React.FC<AssetFormProps> = ({ editingAsset, onCancel }) => {
           <label htmlFor="asset-value" className={styles.label}>
             Value ({currency === 'MYR' ? 'MYR' : 'USD'})
             <span className={styles.tooltip} title="Enter the current value of the asset">
-              ℹ️
+              i
             </span>
           </label>
           <input
@@ -329,7 +329,7 @@ const AssetForm: React.FC<AssetFormProps> = ({ editingAsset, onCancel }) => {
           <label htmlFor="asset-date" className={styles.label}>
             Date
             <span className={styles.tooltip} title="Select the date when this asset value was recorded">
-              ℹ️
+              i
             </span>
           </label>
           <input

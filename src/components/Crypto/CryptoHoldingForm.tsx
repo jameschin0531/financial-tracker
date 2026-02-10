@@ -152,7 +152,7 @@ const CryptoHoldingForm: React.FC<CryptoHoldingFormProps> = ({ holding, onCancel
             <label htmlFor="crypto-symbol" className={styles.label}>
               Crypto Symbol
               <span className={styles.tooltip} title="Enter the crypto symbol (e.g., BTC, ETH, SOL)">
-                ℹ️
+                i
               </span>
             </label>
             <input

@@ -3,70 +3,77 @@
 }
 
 .exportButton {
-  background: var(--bg-secondary);
+  background: var(--gradient-primary), var(--bg-secondary);
   border: 1px solid var(--border-color);
-  border-radius: 4px;
-  padding: 0.5rem 1rem;
+  border-radius: 10px;
+  padding: 0.5rem 0.85rem;
   color: var(--text-primary);
-  font-size: 0.9rem;
-  font-weight: 500;
+  font-size: 0.86rem;
+  font-weight: 600;
   cursor: pointer;
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
-  transition: background-color 0.2s ease;
+  gap: 0.45rem;
+  transition: border-color 0.2s ease, background-color 0.2s ease;
 }
 
 .exportButton:hover {
-  background: var(--bg-hover);
+  background: var(--gradient-primary), var(--bg-hover);
+  border-color: var(--accent-color);
 }
 
-.exportButton:focus {
+.exportButton:focus-visible {
   outline: 2px solid var(--accent-color);
   outline-offset: 2px;
 }
 
 .arrow {
-  font-size: 0.7rem;
-  opacity: 0.7;
+  display: inline-flex;
+  align-items: center;
+}
+
+.arrowIcon {
+  width: 14px;
+  height: 14px;
+  transition: transform 0.2s ease;
+}
+
+.arrowUp {
+  transform: rotate(180deg);
 }
 
 .dropdown {
   position: absolute;
   top: 100%;
   right: 0;
-  margin-top: 0.5rem;
+  margin-top: 0.45rem;
+  min-width: 170px;
   background: var(--bg-card);
   border: 1px solid var(--border-color);
-  border-radius: 4px;
-  box-shadow: 0 4px 12px var(--shadow);
-  min-width: 150px;
+  border-radius: 10px;
+  box-shadow: 0 10px 24px var(--shadow);
   z-index: 1000;
   overflow: hidden;
 }
 
 .dropdownItem {
   width: 100%;
-  padding: 0.75rem 1rem;
-  background: none;
+  padding: 0.72rem 0.85rem;
+  background: transparent;
   border: none;
   color: var(--text-primary);
   text-align: left;
   cursor: pointer;
-  font-size: 0.9rem;
+  font-size: 0.86rem;
   transition: background-color 0.2s ease;
 }
 
-.dropdownItem:hover {
+.dropdownItem:hover,
+.dropdownItem:focus-visible {
   background: var(--bg-hover);
-}
-
-.dropdownItem:focus {
   outline: none;
-  background: var(--bg-hover);
 }
 
-.dropdownItem:first-child {
-  border-bottom: 1px solid var(--border-color);
+.dropdownItem + .dropdownItem {
+  border-top: 1px solid var(--border-color);
 }
-

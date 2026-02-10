@@ -160,7 +160,7 @@ const StockHoldingForm: React.FC<StockHoldingFormProps> = ({ holding, onCancel, 
             <label htmlFor="stock-code" className={styles.label}>
               {stockType === 'Cash' ? 'Cash Name' : 'Stock Code (Ticker)'}
               <span className={styles.tooltip} title={stockType === 'Cash' ? 'Enter a name for this cash holding (e.g., "Tiger Cash", "Etoro Cash")' : 'Enter the stock ticker symbol (e.g., AAPL, TSLA, TSM)'}>
-                ℹ️
+                i
               </span>
             </label>
             <input
@@ -300,7 +300,7 @@ const StockHoldingForm: React.FC<StockHoldingFormProps> = ({ holding, onCancel, 
         )}
         {stockType === 'Cash' && (
           <div className={styles.infoMessage}>
-            💰 Cash holdings don't require market price updates. The amount you enter will be used as both average and market value.
+            Cash holdings don't require market price updates. The amount you enter will be used as both average and market value.
           </div>
         )}
 

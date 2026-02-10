@@ -64,7 +64,7 @@ const CryptoTrackerPage: React.FC = () => {
             onClick={handleUpdatePrices}
             disabled={loadingPrices || data.cryptoHoldings.length === 0}
           >
-            {loadingPrices ? 'Updating...' : '🔄 Update Prices'}
+            {loadingPrices ? 'Updating...' : 'Update Prices'}
           </button>
         </div>
         <div className={styles.portfolioSummary}>
@@ -142,7 +142,7 @@ const CryptoTrackerPage: React.FC = () => {
                               onClick={() => setEditingHolding(holding)}
                               title="Edit"
                             >
-                              ✏️
+                              Edit
                             </button>
                             <button
                               className={styles.deleteButton}
@@ -153,7 +153,7 @@ const CryptoTrackerPage: React.FC = () => {
                               }}
                               title="Delete"
                             >
-                              🗑️
+                              Delete
                             </button>
                           </div>
                         </td>
@@ -213,7 +213,7 @@ const CryptoTrackerPage: React.FC = () => {
                               onClick={() => setEditingAccount(account)}
                               title="Edit"
                             >
-                              ✏️
+                              Edit
                             </button>
                             <button
                               className={styles.deleteButton}
@@ -224,7 +224,7 @@ const CryptoTrackerPage: React.FC = () => {
                               }}
                               title="Delete"
                             >
-                              🗑️
+                              Delete
                             </button>
                           </div>
                         </td>

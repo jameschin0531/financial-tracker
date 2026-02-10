@@ -38,15 +38,9 @@ function AppContent() {
   // Show loading state while checking auth
   if (loading) {
     return (
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'center', 
-        alignItems: 'center', 
-        height: '100vh',
-        color: 'var(--text-primary)',
-        background: 'var(--bg-primary)'
-      }}>
-        Loading...
+      <div className="appLoading">
+        <div className="appLoadingPulse" aria-hidden="true"></div>
+        <span>Syncing dashboard...</span>
       </div>
     );
   }

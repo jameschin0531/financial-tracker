@@ -131,7 +131,7 @@ const IncomeForm: React.FC<IncomeFormProps> = ({ editingIncome, onCancel }) => {
           <label htmlFor="income-source" className={styles.label}>
             Income Source
             <span className={styles.tooltip} title="Enter the source of your income (e.g., Salary, Freelance, Investment)">
-              ℹ️
+              i
             </span>
           </label>
           <input
@@ -149,7 +149,7 @@ const IncomeForm: React.FC<IncomeFormProps> = ({ editingIncome, onCancel }) => {
           <label htmlFor="income-currency" className={styles.label}>
             Currency
             <span className={styles.tooltip} title="Select the currency for this income">
-              ℹ️
+              i
             </span>
           </label>
           <select
@@ -180,7 +180,7 @@ const IncomeForm: React.FC<IncomeFormProps> = ({ editingIncome, onCancel }) => {
           <label htmlFor="income-amount" className={styles.label}>
             Amount ({currency === 'MYR' ? 'MYR' : 'USD'})
             <span className={styles.tooltip} title="Enter the income amount based on the frequency selected">
-              ℹ️
+              i
             </span>
           </label>
           <input
@@ -200,7 +200,7 @@ const IncomeForm: React.FC<IncomeFormProps> = ({ editingIncome, onCancel }) => {
           <label htmlFor="income-frequency" className={styles.label}>
             Frequency
             <span className={styles.tooltip} title="Select how often you receive this income">
-              ℹ️
+              i
             </span>
           </label>
           <select
@@ -219,7 +219,7 @@ const IncomeForm: React.FC<IncomeFormProps> = ({ editingIncome, onCancel }) => {
           <label htmlFor="income-date" className={styles.label}>
             Date
             <span className={styles.tooltip} title="Select the date when this income was received or starts">
-              ℹ️
+              i
             </span>
           </label>
           <input

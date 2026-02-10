@@ -156,7 +156,7 @@ const CashFlowPage: React.FC = () => {
                           }}
                           title="Edit"
                         >
-                          ✏️
+                          Edit
                         </button>
                         <button
                           className={cashFlowStyles.deleteButton}
@@ -171,7 +171,7 @@ const CashFlowPage: React.FC = () => {
                           }}
                           title="Delete"
                         >
-                          🗑️
+                          Delete
                         </button>
                       </div>
                     </td>
