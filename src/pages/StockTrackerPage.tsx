@@ -105,13 +105,17 @@ const StockTrackerPage: React.FC = () => {
   };
 
   const handleUpdatePrices = async () => {
+    const refreshTimingLabel = 'stock-refresh-total';
+    const refreshStartedAt = performance.now();
+    const symbols = [...new Set(
+      data.stockHoldings
+        .filter(h => h.stockType !== 'Cash')
+        .map(h => h.code)
+    )];
+
+    console.time(refreshTimingLabel);
     setLoadingPrices(true);
     try {
-      const symbols = [...new Set(
-        data.stockHoldings
-          .filter(h => h.stockType !== 'Cash')
-          .map(h => h.code)
-      )];
       const pricesUSD = await getStockPrices(symbols);
       
       // Update prices for all holdings - market prices are always stored in USD
@@ -120,6 +124,11 @@ const StockTrackerPage: React.FC = () => {
       console.error('Error updating prices:', error);
       alert('Failed to update stock prices. Please try again.');
     } finally {
+      const refreshDurationMs = performance.now() - refreshStartedAt;
+      console.timeEnd(refreshTimingLabel);
+      console.log(
+        `[stock-refresh] symbols=${symbols.length} durationMs=${refreshDurationMs.toFixed(2)}`,
+      );
       setLoadingPrices(false);
     }
   };
