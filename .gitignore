@@ -38,3 +38,6 @@ data/
 
 # Electron build output
 dist-electron/
+
+# Git worktrees
+.worktrees/
