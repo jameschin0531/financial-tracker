@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useFinancialData } from '../context/FinancialDataContext';
 import type { StockHolding, TradingAccount, Deposit } from '../types/financial';
-import { getStockPrices } from '../services/stockPriceService';
+import { getStockPricesWithMeta } from '../services/stockPriceService';
 import { getUSDToMYRRate, getUSDToHKDRate } from '../services/exchangeRateService';
 import {
   calculateTotalPortfolioValue,
@@ -16,6 +16,13 @@ import StockHoldingForm from '../components/Stocks/StockHoldingForm';
 import TradingAccountForm from '../components/Stocks/TradingAccountForm';
 import DepositForm from '../components/Stocks/DepositForm';
 import styles from './StockTracker.module.css';
+
+interface RefreshMeta {
+  durationMs: number;
+  updatedCount: number;
+  missingCount: number;
+  sourceSummary: string;
+}
 
 const StockTrackerPage: React.FC = () => {
   const { 
@@ -42,6 +49,8 @@ const StockTrackerPage: React.FC = () => {
   // Expanded groups
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [exchangeRates, setExchangeRates] = useState<{ usdToMyr: number; usdToHkd: number }>({ usdToMyr: 4.7, usdToHkd: 7.8 });
+  const [refreshMeta, setRefreshMeta] = useState<RefreshMeta | null>(null);
+  const [refreshWarning, setRefreshWarning] = useState<string | null>(null);
 
   // Fetch exchange rates
   useEffect(() => {
@@ -115,14 +124,39 @@ const StockTrackerPage: React.FC = () => {
 
     console.time(refreshTimingLabel);
     setLoadingPrices(true);
+    setRefreshWarning(null);
+
     try {
-      const pricesUSD = await getStockPrices(symbols);
+      const priceUpdate = await getStockPricesWithMeta(symbols);
+      const sourceCounts = Array.from(priceUpdate.sourceBySymbol.values()).reduce<Record<string, number>>(
+        (acc, source) => {
+          acc[source] = (acc[source] ?? 0) + 1;
+          return acc;
+        },
+        {},
+      );
+      const sourceSummary = Object.entries(sourceCounts)
+        .map(([source, count]) => `${source}:${count}`)
+        .join(', ');
+      const totalDurationMs = performance.now() - refreshStartedAt;
       
       // Update prices for all holdings - market prices are always stored in USD
-      updateStockPrices(pricesUSD);
+      updateStockPrices(priceUpdate.prices);
+      setRefreshMeta({
+        durationMs: totalDurationMs,
+        updatedCount: priceUpdate.prices.size,
+        missingCount: priceUpdate.missing.length,
+        sourceSummary: sourceSummary || 'none',
+      });
+
+      if (priceUpdate.missing.length > 0) {
+        setRefreshWarning(
+          `Partial update: missing ${priceUpdate.missing.length} symbol(s). Existing prices were kept.`,
+        );
+      }
     } catch (error) {
       console.error('Error updating prices:', error);
-      alert('Failed to update stock prices. Please try again.');
+      setRefreshWarning('Failed to update stock prices. Please try again.');
     } finally {
       const refreshDurationMs = performance.now() - refreshStartedAt;
       console.timeEnd(refreshTimingLabel);
@@ -143,9 +177,25 @@ const StockTrackerPage: React.FC = () => {
             onClick={handleUpdatePrices}
             disabled={loadingPrices || data.stockHoldings.length === 0}
           >
-            {loadingPrices ? 'Updating...' : 'Update Prices'}
+            {loadingPrices
+              ? 'Updating prices...'
+              : refreshMeta
+                ? `Updated ${refreshMeta.updatedCount}/${refreshMeta.updatedCount + refreshMeta.missingCount} in ${(refreshMeta.durationMs / 1000).toFixed(1)}s`
+                : 'Update Prices'}
           </button>
         </div>
+        {(refreshMeta || refreshWarning) && (
+          <div className={styles.refreshStatus}>
+            {refreshMeta && (
+              <span className={styles.refreshInfo}>
+                Sources: {refreshMeta.sourceSummary}
+              </span>
+            )}
+            {refreshWarning && (
+              <span className={styles.refreshWarning}>{refreshWarning}</span>
+            )}
+          </div>
+        )}
         <div className={styles.portfolioSummary}>
           <div className={styles.summaryCard}>
             <span className={styles.summaryLabel}>Total Portfolio Value</span>

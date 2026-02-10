@@ -41,6 +41,23 @@
   margin-bottom: 1rem;
 }
 
+.refreshStatus {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  margin-bottom: 1rem;
+}
+
+.refreshInfo {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+
+.refreshWarning {
+  font-size: 0.82rem;
+  color: var(--warning-color, #f59e0b);
+}
+
 .pageTitle {
   font-size: 2rem;
   font-weight: 700;
@@ -460,6 +477,11 @@
     flex-direction: column;
     align-items: flex-start;
     gap: 1rem;
+  }
+
+  .refreshStatus {
+    flex-direction: column;
+    align-items: flex-start;
   }
 
   .tableContainer {
