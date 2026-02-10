@@ -1,8 +1,11 @@
 import { fetchTwelveDataQuotes } from "./providers/twelveDataProvider";
 import { fetchYahooQuotes } from "./providers/yahooProvider";
+import { stockQuoteCache, type StockQuoteCache } from "./stockQuoteCache";
 
 const ALPHA_VANTAGE_BASE = "https://www.alphavantage.co/query";
 const SYMBOL_PATTERN = /^[A-Z0-9.-]+$/;
+const DEFAULT_PROVIDER_TIMEOUT_MS = 1_500;
+const PRIMARY_PROVIDER_MAX_RETRIES = 1;
 
 interface AlphaVantageResponse {
   "Global Quote"?: {
@@ -22,6 +25,13 @@ export interface AggregatedStockQuotes {
   sourceBySymbol: Record<string, QuoteSource>;
   missing: string[];
   durationMs: number;
+}
+
+class ProviderTimeoutError extends Error {
+  constructor(source: QuoteSource, timeoutMs: number) {
+    super(`Provider timeout: ${source} (${timeoutMs}ms)`);
+    this.name = "ProviderTimeoutError";
+  }
 }
 
 const normalizeSymbols = (symbols: string[]): string[] => {
@@ -81,19 +91,76 @@ const buildDefaultProviders = (): QuoteProvider[] => [
   },
 ];
 
+const withTimeout = async <T>(
+  task: Promise<T>,
+  timeoutMs: number,
+  source: QuoteSource,
+): Promise<T> => {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      task,
+      new Promise<T>((_, reject) => {
+        timer = setTimeout(() => reject(new ProviderTimeoutError(source, timeoutMs)), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timer) {
+      clearTimeout(timer);
+    }
+  }
+};
+
+const fetchWithPolicy = async (
+  provider: QuoteProvider,
+  symbols: string[],
+  providerIndex: number,
+  providerTimeoutMs: number,
+): Promise<Record<string, number>> => {
+  const maxAttempts = providerIndex === 0 ? 1 + PRIMARY_PROVIDER_MAX_RETRIES : 1;
+  let attempts = 0;
+  let lastError: unknown;
+
+  while (attempts < maxAttempts) {
+    attempts += 1;
+    try {
+      return await withTimeout(provider.fetchQuotes(symbols), providerTimeoutMs, provider.source);
+    } catch (error) {
+      lastError = error;
+      if (attempts >= maxAttempts) {
+        throw error;
+      }
+    }
+  }
+
+  throw lastError;
+};
+
 export const aggregateStockQuotes = async (
   symbols: string[],
-  options: { providers?: QuoteProvider[] } = {},
+  options: {
+    cache?: StockQuoteCache;
+    providerTimeoutMs?: number;
+    providers?: QuoteProvider[];
+  } = {},
 ): Promise<AggregatedStockQuotes> => {
   const startedAt = performance.now();
   const normalizedSymbols = normalizeSymbols(symbols);
+  const cache = options.cache ?? stockQuoteCache;
+  const providerTimeoutMs = options.providerTimeoutMs ?? DEFAULT_PROVIDER_TIMEOUT_MS;
   const providers = options.providers ?? buildDefaultProviders();
 
-  const prices: Record<string, number> = {};
-  const sourceBySymbol: Record<string, QuoteSource> = {};
-  const remainingSymbols = new Set<string>(normalizedSymbols);
+  const freshCache = cache.getBatch(normalizedSymbols);
+  const staleCache = cache.getBatch(normalizedSymbols, { allowStale: true });
 
-  for (const provider of providers) {
+  const prices: Record<string, number> = { ...freshCache.prices };
+  const sourceBySymbol: Record<string, QuoteSource> = { ...freshCache.sourceBySymbol };
+  const newlyFetchedPrices: Record<string, number> = {};
+  const newlyFetchedSources: Record<string, QuoteSource> = {};
+  const remainingSymbols = new Set<string>(freshCache.missing);
+  let timedOut = false;
+
+  for (const [providerIndex, provider] of providers.entries()) {
     if (remainingSymbols.size === 0) {
       break;
     }
@@ -101,7 +168,13 @@ export const aggregateStockQuotes = async (
     const requestSymbols = Array.from(remainingSymbols);
 
     try {
-      const providerPrices = await provider.fetchQuotes(requestSymbols);
+      const providerPrices = await fetchWithPolicy(
+        provider,
+        requestSymbols,
+        providerIndex,
+        providerTimeoutMs,
+      );
+
       for (const [rawSymbol, rawPrice] of Object.entries(providerPrices)) {
         const symbol = rawSymbol.toUpperCase();
         if (!remainingSymbols.has(symbol)) {
@@ -113,12 +186,33 @@ export const aggregateStockQuotes = async (
 
         prices[symbol] = rawPrice;
         sourceBySymbol[symbol] = provider.source;
+        newlyFetchedPrices[symbol] = rawPrice;
+        newlyFetchedSources[symbol] = provider.source;
         remainingSymbols.delete(symbol);
       }
     } catch (error) {
+      if (error instanceof ProviderTimeoutError) {
+        timedOut = true;
+      }
       console.warn(`Quote provider failed: ${provider.source}`, error);
     }
   }
+
+  if (timedOut && remainingSymbols.size > 0) {
+    for (const symbol of Array.from(remainingSymbols)) {
+      const fallbackPrice = staleCache.prices[symbol];
+      const fallbackSource = staleCache.sourceBySymbol[symbol];
+      if (fallbackPrice === undefined || fallbackSource === undefined) {
+        continue;
+      }
+
+      prices[symbol] = fallbackPrice;
+      sourceBySymbol[symbol] = fallbackSource;
+      remainingSymbols.delete(symbol);
+    }
+  }
+
+  cache.setBatch(newlyFetchedPrices, newlyFetchedSources);
 
   return {
     prices,

@@ -1,11 +1,13 @@
 import { describe, expect, test } from "bun:test";
 import { aggregateStockQuotes } from "../../api/stockQuoteAggregator";
+import { StockQuoteCache } from "../../api/stockQuoteCache";
 
 describe("stock quote aggregator", () => {
   test("merges quotes from providers, deduplicates symbols, and tracks source", async () => {
     const providerCalls: Array<{ source: string; symbols: string[] }> = [];
 
     const result = await aggregateStockQuotes(["aapl", "TSLA", "AAPL"], {
+      cache: new StockQuoteCache(60_000),
       providers: [
         {
           source: "yahoo",
@@ -34,6 +36,7 @@ describe("stock quote aggregator", () => {
 
   test("returns partial results and does not throw when a provider fails", async () => {
     const result = await aggregateStockQuotes(["AAPL", "TSLA"], {
+      cache: new StockQuoteCache(60_000),
       providers: [
         {
           source: "yahoo",
