@@ -1,6 +1,7 @@
 import { serve, file, build } from 'bun';
 import { existsSync, mkdirSync } from 'fs';
 import { join } from 'path';
+import { handleStockQuoteAggregatorRequest } from './api/stockQuoteAggregator';
 
 // Cache for built app
 let appCache: { code: string; css?: string; timestamp: number } | null = null;
@@ -99,6 +100,22 @@ serve({
     }
     
     // API endpoints - check BEFORE other routes
+    if (pathname === '/api/stock-prices') {
+      if (req.method !== 'GET') {
+        return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+          status: 405,
+          headers: {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type',
+          },
+        });
+      }
+
+      return await handleStockQuoteAggregatorRequest(url.searchParams.get('symbols'));
+    }
+
     // API endpoint: GET financial data
     if (pathname === '/api/data' && req.method === 'GET') {
       try {
