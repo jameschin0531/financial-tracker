@@ -10,9 +10,6 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
   const config = {
     supabaseUrl: process.env.SUPABASE_URL || '',
     supabaseAnonKey: process.env.SUPABASE_ANON_KEY || '',
-    alphaVantageApiKey: process.env.ALPHA_VANTAGE_API_KEY || '',
-    coingeckoApiKey: process.env.COINGECKO_API_KEY || '',
-    exchangeRateApiKey: process.env.EXCHANGE_RATE_API_KEY || '',
   };
 
   // Set CORS headers

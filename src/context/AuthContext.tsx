@@ -1,14 +1,10 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { User, Session, AuthError } from '@supabase/supabase-js';
 import { initializeSupabase, getSupabase, isSupabaseInitialized } from '../services/supabaseClient';
-import { setAlphaVantageApiKey } from '../services/stockPriceService';
 
 interface AppConfig {
   supabaseUrl: string;
   supabaseAnonKey: string;
-  alphaVantageApiKey?: string;
-  coingeckoApiKey?: string;
-  exchangeRateApiKey?: string;
 }
 
 interface AuthContextType {
@@ -47,15 +43,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setConfig({
           supabaseUrl: configData.supabaseUrl,
           supabaseAnonKey: configData.supabaseAnonKey,
-          alphaVantageApiKey: configData.alphaVantageApiKey,
-          coingeckoApiKey: configData.coingeckoApiKey,
-          exchangeRateApiKey: configData.exchangeRateApiKey,
         });
-
-        // Set API keys for services
-        if (configData.alphaVantageApiKey) {
-          setAlphaVantageApiKey(configData.alphaVantageApiKey);
-        }
 
         // Initialize Supabase client
         const supabase = initializeSupabase(configData.supabaseUrl, configData.supabaseAnonKey);
