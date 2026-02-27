@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ThemeProvider } from './context/ThemeContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { FinancialDataProvider } from './context/FinancialDataContext';
+import { AmountVisibilityProvider, useAmountVisibility } from './context/AmountVisibilityContext';
 import Layout from './components/Layout/Layout';
 import Dashboard from './components/Dashboard/Dashboard';
 import AssetsPage from './pages/AssetsPage';
@@ -15,6 +16,7 @@ import './App.css';
 function AppContent() {
   const [currentPage, setCurrentPage] = useState('dashboard');
   const { session, loading } = useAuth();
+  const { hideAmounts } = useAmountVisibility();
 
   const renderPage = () => {
     switch (currentPage) {
@@ -53,7 +55,7 @@ function AppContent() {
   // Show main app if logged in
   return (
     <FinancialDataProvider>
-      <Layout currentPage={currentPage} onPageChange={setCurrentPage}>
+      <Layout currentPage={currentPage} onPageChange={setCurrentPage} amountVisibility={hideAmounts ? 'hidden' : 'visible'}>
         {renderPage()}
       </Layout>
     </FinancialDataProvider>
@@ -64,7 +66,9 @@ function App() {
   return (
     <ThemeProvider>
       <AuthProvider>
-        <AppContent />
+        <AmountVisibilityProvider>
+          <AppContent />
+        </AmountVisibilityProvider>
       </AuthProvider>
     </ThemeProvider>
   );

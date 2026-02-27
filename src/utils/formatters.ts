@@ -1,4 +1,27 @@
+const AMOUNT_VISIBILITY_STORAGE_KEY = 'financialAppHideAmounts';
+const MASKED_AMOUNT = '****';
+
+const shouldHideAmounts = (): boolean => {
+  if (typeof window === 'undefined' || typeof window.localStorage === 'undefined') {
+    return true;
+  }
+
+  const stored = window.localStorage.getItem(AMOUNT_VISIBILITY_STORAGE_KEY);
+  if (stored === 'false') {
+    return false;
+  }
+  if (stored === 'true') {
+    return true;
+  }
+
+  return true;
+};
+
 export const formatCurrency = (amount: number, currency: 'MYR' | 'USD' | 'HKD' = 'MYR'): string => {
+  if (shouldHideAmounts()) {
+    return MASKED_AMOUNT;
+  }
+
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: currency,
@@ -12,6 +35,10 @@ export const formatCurrencyWithRate = (
   currency: 'MYR' | 'USD' | 'HKD',
   exchangeRate?: number
 ): string => {
+  if (shouldHideAmounts()) {
+    return MASKED_AMOUNT;
+  }
+
   const formatted = formatCurrency(amount, currency);
   if ((currency === 'USD' || currency === 'HKD') && exchangeRate) {
     const myrAmount = amount * exchangeRate;
