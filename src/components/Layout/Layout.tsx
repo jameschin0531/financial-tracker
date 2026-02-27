@@ -7,9 +7,10 @@ interface LayoutProps {
   children: ReactNode;
   currentPage: string;
   onPageChange: (page: string) => void;
+  amountVisibility: 'hidden' | 'visible';
 }
 
-const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageChange }) => {
+const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageChange, amountVisibility }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const handlePageChange = (page: string) => {
@@ -18,7 +19,7 @@ const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageChange }) 
   };
 
   return (
-    <div className={styles.layout}>
+    <div className={styles.layout} data-amount-visibility={amountVisibility}>
       <div className={styles.sidebarWrapper}>
         <div className={`${styles.sidebarContainer} ${sidebarOpen ? styles.sidebarOpen : ''}`}>
           <Sidebar currentPage={currentPage} onPageChange={handlePageChange} />

@@ -329,12 +329,14 @@ const StockTrackerPage: React.FC = () => {
                       <th>P&L</th>
                       <th>Portion</th>
                       <th>Accounts</th>
+                      <th>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {sortedGroupedHoldings.map((group) => {
                       const isExpanded = expandedGroups.has(group.code);
                       const hasMultipleHoldings = group.holdings.length > 1;
+                      const singleHolding = hasMultipleHoldings ? null : group.holdings[0];
                       
                       
                       return (
@@ -401,6 +403,45 @@ const StockTrackerPage: React.FC = () => {
                                 ))}
                               </div>
                             </td>
+                            <td>
+                              {hasMultipleHoldings ? (
+                                <button
+                                  className={styles.editButton}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    toggleGroup(group.code);
+                                  }}
+                                  title={isExpanded ? 'Collapse group' : 'Expand group'}
+                                >
+                                  {isExpanded ? 'Collapse' : 'Expand to edit'}
+                                </button>
+                              ) : singleHolding ? (
+                                <div className={styles.actionButtons}>
+                                  <button
+                                    className={styles.editButton}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setEditingHolding(singleHolding);
+                                    }}
+                                    title="Edit"
+                                  >
+                                    Edit
+                                  </button>
+                                  <button
+                                    className={styles.deleteButton}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      if (confirm('Delete this holding?')) {
+                                        deleteStockHolding(singleHolding.id);
+                                      }
+                                    }}
+                                    title="Delete"
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
+                              ) : null}
+                            </td>
                           </tr>
                           
                           {/* Expanded Holdings */}
@@ -433,7 +474,7 @@ const StockTrackerPage: React.FC = () => {
                                 <td></td>
                                 <td className={styles.subCodeCell}>
                                   <span className={styles.subIndicator}>--</span>
-                                  {holding.account}
+                                  {holding.name || holding.code}
                                 </td>
                                 <td>
                                   {holding.stockType === 'Cash' 
@@ -466,6 +507,7 @@ const StockTrackerPage: React.FC = () => {
                                   {formatCurrency(pnl.myr, 'MYR')} ({pnl.percentage.toFixed(1)}%)
                                 </td>
                                 <td>{portion.toFixed(1)}%</td>
+                                <td>{holding.account}</td>
                                 <td>
                                   <div className={styles.actionButtons}>
                                     <button
