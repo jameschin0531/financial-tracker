@@ -129,7 +129,7 @@ const toISODate = (d: Date): string => {
 };
 
 // Monday-based start of week (local time) for consistent weekly grouping.
-const startOfWeekISO = (isoDate: string): string => {
+export const startOfWeekISO = (isoDate: string): string => {
   const d = new Date(isoDate);
   // If parsing fails, fall back to today to avoid breaking charts
   if (Number.isNaN(d.getTime())) {
@@ -142,22 +142,101 @@ const startOfWeekISO = (isoDate: string): string => {
   return toISODate(d);
 };
 
+const parseISODate = (isoDate: string): Date => {
+  const d = new Date(`${isoDate}T00:00:00`);
+  if (Number.isNaN(d.getTime())) {
+    return new Date();
+  }
+  return d;
+};
+
+const addDays = (isoDate: string, days: number): string => {
+  const d = parseISODate(isoDate);
+  d.setDate(d.getDate() + days);
+  return toISODate(d);
+};
+
+export interface NetWorthPoint {
+  date: string;
+  netWorth: number;
+}
+
+export interface NetWorthDailySnapshot {
+  date: string;
+  netWorth: number;
+}
+
+export interface NetWorthWeeklySnapshot {
+  weekStart: string;
+  netWorth: number;
+}
+
+export const buildWeeklyNetWorthSeries = (
+  weeklySnapshots: NetWorthWeeklySnapshot[],
+  dailySnapshots: NetWorthDailySnapshot[],
+): NetWorthPoint[] => {
+  const weeklyByWeek = new Map<string, number>();
+  const latestDailyByWeek = new Map<string, NetWorthDailySnapshot>();
+  const weekKeys = new Set<string>();
+
+  weeklySnapshots.forEach((snapshot) => {
+    const weekStart = startOfWeekISO(snapshot.weekStart);
+    weeklyByWeek.set(weekStart, snapshot.netWorth);
+    weekKeys.add(weekStart);
+  });
+
+  dailySnapshots.forEach((snapshot) => {
+    const weekStart = startOfWeekISO(snapshot.date);
+    const existing = latestDailyByWeek.get(weekStart);
+
+    if (!existing || snapshot.date > existing.date) {
+      latestDailyByWeek.set(weekStart, snapshot);
+    }
+
+    weekKeys.add(weekStart);
+  });
+
+  if (weekKeys.size === 0) {
+    return [];
+  }
+
+  const sortedWeeks = Array.from(weekKeys).sort((a, b) => a.localeCompare(b));
+  const firstWeek = sortedWeeks[0];
+  const lastWeek = sortedWeeks[sortedWeeks.length - 1];
+
+  if (!firstWeek || !lastWeek) {
+    return [];
+  }
+
+  const output: NetWorthPoint[] = [];
+  let cursor = firstWeek;
+  let carryForwardValue: number | null = null;
+
+  while (cursor <= lastWeek) {
+    const exactWeekly = weeklyByWeek.get(cursor);
+    const inWeekDaily = latestDailyByWeek.get(cursor);
+
+    if (exactWeekly !== undefined) {
+      carryForwardValue = exactWeekly;
+      output.push({ date: cursor, netWorth: exactWeekly });
+    } else if (inWeekDaily) {
+      carryForwardValue = inWeekDaily.netWorth;
+      output.push({ date: cursor, netWorth: inWeekDaily.netWorth });
+    } else if (carryForwardValue !== null) {
+      output.push({ date: cursor, netWorth: carryForwardValue });
+    }
+
+    cursor = addDays(cursor, 7);
+  }
+
+  return output;
+};
+
 export const getWeeklyNetWorthHistory = async (
   data: FinancialData
 ): Promise<Array<{ date: string; netWorth: number }>> => {
   const daily = await getNetWorthHistory(data);
-  if (daily.length === 0) return [];
-
-  const weekMap = new Map<string, number>();
-  // Take the latest netWorth within each week (so the weekly chart trends with time)
-  daily.forEach((point) => {
-    const week = startOfWeekISO(point.date);
-    weekMap.set(week, point.netWorth);
-  });
-
-  return Array.from(weekMap.entries())
-    .map(([date, netWorth]) => ({ date, netWorth }))
-    .sort((a, b) => a.date.localeCompare(b.date));
+  return buildWeeklyNetWorthSeries([], daily.map((point) => ({ date: point.date, netWorth: point.netWorth })));
 };
 
 export const getNetWorthHistory = async (data: FinancialData): Promise<Array<{ date: string; netWorth: number }>> => {
