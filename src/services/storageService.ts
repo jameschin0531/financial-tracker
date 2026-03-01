@@ -1,6 +1,12 @@
 import type { FinancialData } from '../types/financial';
 import { getSupabase, isSupabaseInitialized } from './supabaseClient';
 
+const FINANCIAL_DATA_CACHE_VERSION = 'v1';
+
+const getFinancialDataCacheKey = (userId: string): string => {
+  return `financial-data-cache:${FINANCIAL_DATA_CACHE_VERSION}:${userId}`;
+};
+
 export const migrateDataFormat = (data: any): FinancialData => {
   const defaultAssetCategories = ['Cash', 'Savings Account', 'Checking Account', 'Investment', 'Retirement Account', 'Real Estate', 'Vehicle', 'Other'];
   const defaultLiabilityCategories = ['Credit Card', 'Personal Loan', 'Mortgage', 'Auto Loan', 'Student Loan', 'Medical Debt', 'Other'];
@@ -118,6 +124,40 @@ export const loadFinancialData = async (userId: string): Promise<FinancialData> 
   } catch (error) {
     console.error('Error loading financial data:', error);
     return getDefaultData();
+  }
+};
+
+export const loadCachedFinancialData = (userId: string): FinancialData | null => {
+  try {
+    if (typeof window === 'undefined' || !window.localStorage) {
+      return null;
+    }
+
+    const cacheKey = getFinancialDataCacheKey(userId);
+    const cached = window.localStorage.getItem(cacheKey);
+
+    if (!cached) {
+      return null;
+    }
+
+    const parsed = JSON.parse(cached);
+    return migrateDataFormat(parsed);
+  } catch (error) {
+    console.error('Error loading cached financial data:', error);
+    return null;
+  }
+};
+
+export const saveCachedFinancialData = (userId: string, data: FinancialData): void => {
+  try {
+    if (typeof window === 'undefined' || !window.localStorage) {
+      return;
+    }
+
+    const cacheKey = getFinancialDataCacheKey(userId);
+    window.localStorage.setItem(cacheKey, JSON.stringify(data));
+  } catch (error) {
+    console.error('Error saving cached financial data:', error);
   }
 };
 

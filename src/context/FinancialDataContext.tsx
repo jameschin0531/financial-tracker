@@ -1,7 +1,7 @@
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import type { ReactNode } from 'react';
 import type { Asset, Liability, Income, Expense, FinancialData, StockHolding, CryptoHolding, TradingAccount, CryptoAccount, Deposit } from '../types/financial';
-import { loadFinancialData, saveFinancialData } from '../services/storageService';
+import { loadFinancialData, loadCachedFinancialData, saveCachedFinancialData, saveFinancialData } from '../services/storageService';
 import { getStockPrices } from '../services/stockPriceService';
 import { getCryptoPrices } from '../services/cryptoPriceService';
 import { getHKDToMYRRate, getUSDToMYRRate } from '../services/exchangeRateService';
@@ -71,36 +71,133 @@ const getDefaultData = (): FinancialData => ({
   deposits: [],
 });
 
+const DATA_LOAD_TIMEOUT_MS = 10000;
+
+const withTimeout = async <T,>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> => {
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => {
+      reject(new Error(message));
+    }, timeoutMs);
+  });
+
+  try {
+    return await Promise.race([promise, timeoutPromise]);
+  } finally {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+  }
+};
+
 export const FinancialDataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const { user, session } = useAuth();
+  const { user } = useAuth();
   const [data, setData] = useState<FinancialData>(getDefaultData());
   const [isLoading, setIsLoading] = useState(true);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const initialRefreshRef = useRef<{ userId: string | null; inFlight: boolean }>({ userId: null, inFlight: false });
+  const activeUserIdRef = useRef<string | null>(null);
+  const loadingDataRef = useRef(false);
+
+  const refreshDataFromServer = useCallback(async (userId: string, blockUi: boolean) => {
+    if (loadingDataRef.current) {
+      return;
+    }
+
+    loadingDataRef.current = true;
+    if (blockUi) {
+      setIsLoading(true);
+    }
+
+    try {
+      const loadedData = await withTimeout(
+        loadFinancialData(userId),
+        DATA_LOAD_TIMEOUT_MS,
+        `Financial data load timed out after ${DATA_LOAD_TIMEOUT_MS}ms`,
+      );
+
+      if (activeUserIdRef.current !== userId) {
+        return;
+      }
+
+      setData(loadedData);
+      saveCachedFinancialData(userId, loadedData);
+    } catch (error) {
+      console.error('Error refreshing financial data from server:', error);
+    } finally {
+      if (blockUi && activeUserIdRef.current === userId) {
+        setIsLoading(false);
+      }
+      loadingDataRef.current = false;
+    }
+  }, []);
 
   // Load data when user logs in
   useEffect(() => {
     const loadData = async () => {
       if (!user) {
+        activeUserIdRef.current = null;
         // User logged out, reset to defaults
         setData(getDefaultData());
         setIsLoading(false);
         return;
       }
 
+      activeUserIdRef.current = user.id;
+
+      const cachedData = loadCachedFinancialData(user.id);
+
+      if (cachedData) {
+        setData(cachedData);
+        setIsLoading(false);
+        void refreshDataFromServer(user.id, false);
+        return;
+      }
+
       try {
-        setIsLoading(true);
-        const loadedData = await loadFinancialData(user.id);
-        setData(loadedData);
+        await refreshDataFromServer(user.id, true);
       } catch (error) {
-        console.error('Error loading financial data:', error);
+        console.error('Error loading initial financial data:', error);
         setData(getDefaultData());
-      } finally {
         setIsLoading(false);
       }
     };
+
     loadData();
-  }, [user]);
+  }, [user, refreshDataFromServer]);
+
+  useEffect(() => {
+    if (!user) {
+      return;
+    }
+
+    const handleResumeRefresh = () => {
+      if (document.visibilityState === 'hidden') {
+        return;
+      }
+
+      void refreshDataFromServer(user.id, false);
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        handleResumeRefresh();
+      }
+    };
+
+    window.addEventListener('focus', handleResumeRefresh);
+    window.addEventListener('online', handleResumeRefresh);
+    window.addEventListener('pageshow', handleResumeRefresh);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener('focus', handleResumeRefresh);
+      window.removeEventListener('online', handleResumeRefresh);
+      window.removeEventListener('pageshow', handleResumeRefresh);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [user, refreshDataFromServer]);
 
   useEffect(() => {
     if (!user) {
@@ -197,6 +294,8 @@ export const FinancialDataProvider: React.FC<{ children: ReactNode }> = ({ child
     if (isLoading || !user) {
       return;
     }
+
+    saveCachedFinancialData(user.id, data);
 
     // Clear existing timeout
     if (saveTimeoutRef.current) {
