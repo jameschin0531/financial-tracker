@@ -121,6 +121,14 @@
   margin-bottom: 0.25rem;
 }
 
+.summaryValuePositive {
+  color: var(--success-color);
+}
+
+.summaryValueNegative {
+  color: var(--danger-color);
+}
+
 .summarySubtext {
   display: block;
   font-size: 0.9rem;

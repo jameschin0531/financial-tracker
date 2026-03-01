@@ -8,7 +8,6 @@ import {
   calculatePortfolioAllocation,
   calculateAccountSummary,
   calculateHoldingPandL,
-  calculateTotalDeposits,
 } from '../services/stockCalculations';
 import { formatCurrency, formatCurrencyWithRate } from '../utils/formatters';
 import { groupHoldingsByCode, filterGroupedHoldings, sortGroupedHoldings, type GroupedHolding } from '../utils/stockGrouping';
@@ -100,6 +99,18 @@ const StockTrackerPage: React.FC = () => {
     filterPortionMax
   );
   const sortedGroupedHoldings = sortGroupedHoldings(filteredGroupedHoldings, sortBy);
+  const totalPortfolioPandL = groupedHoldings.reduce((sum, group) => sum + group.totalPandL.myr, 0);
+  const totalPortfolioCostBasis = portfolioValue.myr - totalPortfolioPandL;
+  const totalPortfolioPandLPercentage = totalPortfolioCostBasis > 0
+    ? (totalPortfolioPandL / totalPortfolioCostBasis) * 100
+    : 0;
+  const totalInitialCapitalMyr = accountSummary.reduce((sum, account) => {
+    return sum + (account.initialMYR || 0);
+  }, 0);
+  const totalPandLFromInitialCapital = portfolioValue.myr - totalInitialCapitalMyr;
+  const totalPandLFromInitialCapitalPercentage = totalInitialCapitalMyr > 0
+    ? (totalPandLFromInitialCapital / totalInitialCapitalMyr) * 100
+    : 0;
 
   const toggleGroup = (code: string) => {
     setExpandedGroups(prev => {
@@ -201,6 +212,32 @@ const StockTrackerPage: React.FC = () => {
             <span className={styles.summaryLabel}>Total Portfolio Value</span>
             <span className={styles.summaryValue}>{formatCurrency(portfolioValue.myr, 'MYR')}</span>
             <span className={styles.summarySubtext}>{formatCurrency(portfolioValue.usd, 'USD')}</span>
+          </div>
+          <div className={styles.summaryCard}>
+            <span className={styles.summaryLabel}>Total P&amp;L</span>
+            <span
+              className={`${styles.summaryValue} ${
+                totalPortfolioPandL >= 0 ? styles.summaryValuePositive : styles.summaryValueNegative
+              }`}
+            >
+              {formatCurrency(totalPortfolioPandL, 'MYR')}
+            </span>
+            <span className={styles.summarySubtext}>
+              {`${totalPortfolioPandLPercentage >= 0 ? '+' : ''}${totalPortfolioPandLPercentage.toFixed(1)}%`}
+            </span>
+          </div>
+          <div className={styles.summaryCard}>
+            <span className={styles.summaryLabel}>Total P&amp;L (Initial Capital)</span>
+            <span
+              className={`${styles.summaryValue} ${
+                totalPandLFromInitialCapital >= 0 ? styles.summaryValuePositive : styles.summaryValueNegative
+              }`}
+            >
+              {formatCurrency(totalPandLFromInitialCapital, 'MYR')}
+            </span>
+            <span className={styles.summarySubtext}>
+              {`${totalPandLFromInitialCapitalPercentage >= 0 ? '+' : ''}${totalPandLFromInitialCapitalPercentage.toFixed(1)}% from ${formatCurrency(totalInitialCapitalMyr, 'MYR')}`}
+            </span>
           </div>
         </div>
       </div>
