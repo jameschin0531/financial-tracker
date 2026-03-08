@@ -268,6 +268,92 @@
   margin: 0 0 1rem 0;
 }
 
+.allocationLayout {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(260px, 1.1fr);
+  gap: 1rem;
+  align-items: center;
+}
+
+.allocationChartCanvas {
+  min-width: 0;
+}
+
+.allocationBreakdown {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+.allocationBreakdownHeader {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  padding: 0.35rem 0.6rem;
+}
+
+.allocationBreakdownRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 0.75rem;
+  align-items: center;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 0.45rem 0.6rem;
+  background: color-mix(in srgb, var(--bg-card) 85%, transparent);
+}
+
+.allocationCategory {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.allocationDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  flex: 0 0 auto;
+}
+
+.allocationCategoryName {
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.allocationPortion {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.allocationValue {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  text-align: right;
+}
+
+.allocationTotalRow {
+  margin-top: 0.35rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-top: 1px solid var(--border-color);
+  padding: 0.65rem 0.2rem 0;
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
 @media (max-width: 768px) {
   .dashboard {
     padding: 1rem;
@@ -294,6 +380,11 @@
 
   .chartCard {
     padding: 1rem;
+  }
+
+  .allocationLayout {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
   }
 }
 

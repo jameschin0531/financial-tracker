@@ -3,6 +3,7 @@ import { useFinancialData } from '../../context/FinancialDataContext';
 import {
   calculateTotalAssets,
   calculateCurrentAssets,
+  calculateCashPosition,
   calculateTotalLiabilities,
   calculateNetWorth,
   calculateMonthlyIncome,
@@ -14,6 +15,7 @@ import MetricsCard from './MetricsCard';
 import NetWorthChart from './NetWorthChart';
 import AssetAllocationChart from './AssetAllocationChart';
 import CurrentAssetAllocationChart from './CurrentAssetAllocationChart';
+import { DASHBOARD_SECTION_ORDER, type DashboardSectionKey } from './dashboardSections';
 import styles from './Dashboard.module.css';
 
 const Dashboard: React.FC = () => {
@@ -40,6 +42,8 @@ const Dashboard: React.FC = () => {
   }, [data.assets, data.liabilities, data.stockHoldings, data.cryptoHoldings]);
 
   const currentAssets = calculateCurrentAssets(data.assets);
+  const cashPosition = calculateCashPosition(data.assets);
+  const totalCurrentAssets = currentAssets + stockPortfolioValue + cryptoPortfolioValue;
   const totalLiabilities = calculateTotalLiabilities(data.liabilities);
   const monthlyIncome = calculateMonthlyIncome(data.income);
   // Calculate total expenses (sum of all expenses, not filtered by current month)
@@ -55,22 +59,22 @@ const Dashboard: React.FC = () => {
     return sum + amount;
   }, 0);
   const cashFlow = monthlyIncome - monthlyExpenses;
-
-  return (
-    <div className={styles.dashboard}>
-      <div className={styles.dashboardHeader}>
-        <h1 className={styles.dashboardTitle}>Financial Overview</h1>
-      </div>
-      
-      {/* Section 1: Assets */}
+  const sections: Record<DashboardSectionKey, React.ReactNode> = {
+    assets: (
       <div className={styles.section}>
         <h2 className={styles.sectionTitle}>Assets</h2>
         <div className={styles.sectionGrid}>
           <MetricsCard
             title="Current Assets"
-            value={formatCurrency(currentAssets)}
+            value={formatCurrency(totalCurrentAssets)}
             subtitle={''}
             trend="positive"
+          />
+          <MetricsCard
+            title="Cash Position"
+            value={formatCurrency(cashPosition)}
+            subtitle={''}
+            trend={cashPosition > 0 ? 'positive' : 'neutral'}
           />
           <MetricsCard
             title="Stock"
@@ -86,32 +90,8 @@ const Dashboard: React.FC = () => {
           />
         </div>
       </div>
-
-      {/* Section 2: Total Assets, Liabilities & Net Worth */}
-      <div className={styles.section}>
-        <h2 className={styles.sectionTitle}>Financial Summary</h2>
-        <div className={styles.sectionGrid}>
-          <MetricsCard
-            title="Total Assets"
-            value={formatCurrency(totalAssets)}
-            subtitle={`${data.assets.length} asset${data.assets.length !== 1 ? 's' : ''}${data.stockHoldings.length > 0 ? ` + ${data.stockHoldings.length} stock${data.stockHoldings.length !== 1 ? 's' : ''}` : ''}${data.cryptoHoldings.length > 0 ? ` + ${data.cryptoHoldings.length} crypto${data.cryptoHoldings.length !== 1 ? 's' : ''}` : ''}`}
-            trend="positive"
-          />
-          <MetricsCard
-            title="Total Liabilities"
-            value={formatCurrency(totalLiabilities)}
-            subtitle={`${data.liabilities.length} liability${data.liabilities.length !== 1 ? 'ies' : ''}`}
-            trend="negative"
-          />
-          <MetricsCard
-            title="Net Worth"
-            value={formatCurrency(netWorth)}
-            trend={netWorth >= 0 ? 'positive' : 'negative'}
-          />
-        </div>
-      </div>
-
-      {/* Section 3: Cash Flow */}
+    ),
+    cashFlow: (
       <div className={styles.section}>
         <h2 className={styles.sectionTitle}>Cash Flow</h2>
         <div className={styles.sectionGrid}>
@@ -135,6 +115,41 @@ const Dashboard: React.FC = () => {
           />
         </div>
       </div>
+    ),
+    financialSummary: (
+      <div className={styles.section}>
+        <h2 className={styles.sectionTitle}>Financial Summary</h2>
+        <div className={styles.sectionGrid}>
+          <MetricsCard
+            title="Net Worth"
+            value={formatCurrency(netWorth)}
+            trend={netWorth >= 0 ? 'positive' : 'negative'}
+          />
+          <MetricsCard
+            title="Total Assets"
+            value={formatCurrency(totalAssets)}
+            subtitle={`${data.assets.length} asset${data.assets.length !== 1 ? 's' : ''}${data.stockHoldings.length > 0 ? ` + ${data.stockHoldings.length} stock${data.stockHoldings.length !== 1 ? 's' : ''}` : ''}${data.cryptoHoldings.length > 0 ? ` + ${data.cryptoHoldings.length} crypto${data.cryptoHoldings.length !== 1 ? 's' : ''}` : ''}`}
+            trend="positive"
+          />
+          <MetricsCard
+            title="Total Liabilities"
+            value={formatCurrency(totalLiabilities)}
+            subtitle={`${data.liabilities.length} liability${data.liabilities.length !== 1 ? 'ies' : ''}`}
+            trend="negative"
+          />
+        </div>
+      </div>
+    ),
+  };
+
+  return (
+    <div className={styles.dashboard}>
+      <div className={styles.dashboardHeader}>
+        <h1 className={styles.dashboardTitle}>Financial Overview</h1>
+      </div>
+      {DASHBOARD_SECTION_ORDER.map((sectionKey) => (
+        <React.Fragment key={sectionKey}>{sections[sectionKey]}</React.Fragment>
+      ))}
 
       <div className={styles.chartsGrid}>
         <div className={styles.chartCard}>

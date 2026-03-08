@@ -54,6 +54,36 @@ export const calculateCurrentAssets = (assets: Asset[]): number => {
     }, 0);
 };
 
+export const calculateCashPosition = (assets: Asset[]): number => {
+  return assets
+    .filter(asset => asset.assetType === 'current' && asset.category.trim().toLowerCase() === 'cash')
+    .reduce((sum, asset) => {
+      return sum + convertToMYR(asset.value, asset.currency, asset.exchangeRate);
+    }, 0);
+};
+
+export const calculateTotalCurrentAssets = async (
+  assets: Asset[],
+  stockHoldings: StockHolding[] = [],
+  cryptoHoldings: CryptoHolding[] = [],
+): Promise<number> => {
+  const currentAssetTotal = calculateCurrentAssets(assets);
+
+  let stockTotal = 0;
+  if (stockHoldings.length > 0) {
+    const stockValue = await calculateTotalPortfolioValue(stockHoldings);
+    stockTotal = stockValue.myr;
+  }
+
+  let cryptoTotal = 0;
+  if (cryptoHoldings.length > 0) {
+    const cryptoValue = await calculateTotalCryptoPortfolioValue(cryptoHoldings);
+    cryptoTotal = cryptoValue.myr;
+  }
+
+  return currentAssetTotal + stockTotal + cryptoTotal;
+};
+
 export const calculateFixedAssets = (assets: Asset[]): number => {
   return assets
     .filter(asset => asset.assetType === 'fixed')

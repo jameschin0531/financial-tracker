@@ -5,18 +5,23 @@ import AssetForm from '../components/Forms/AssetForm';
 import { calculateTotalAssets, calculateCurrentAssets, calculateFixedAssets } from '../services/calculations';
 import { calculateTotalPortfolioValue } from '../services/stockCalculations';
 import { calculateTotalCryptoPortfolioValue } from '../services/cryptoCalculations';
+import { getUSDToMYRRate } from '../services/exchangeRateService';
+import { buildUsdAssetRefreshUpdates } from '../services/assetCurrencyRefresh';
 import { formatCurrency, formatCurrencyWithRate } from '../utils/formatters';
 import styles from './Pages.module.css';
 
 const AssetsPage: React.FC = () => {
-  const { data, deleteAsset } = useFinancialData();
+  const { data, deleteAsset, updateAsset } = useFinancialData();
   const [editingAsset, setEditingAsset] = useState<Asset | undefined>(undefined);
   const [totalAssets, setTotalAssets] = useState(0);
   const [stockPortfolioValue, setStockPortfolioValue] = useState(0);
   const [cryptoPortfolioValue, setCryptoPortfolioValue] = useState(0);
+  const [refreshingUsdAssets, setRefreshingUsdAssets] = useState(false);
+  const [usdRefreshMessage, setUsdRefreshMessage] = useState<string | null>(null);
   
   const currentAssets = calculateCurrentAssets(data.assets);
   const fixedAssets = calculateFixedAssets(data.assets);
+  const usdAssetCount = data.assets.filter((asset) => asset.currency === 'USD').length;
 
   useEffect(() => {
     const calculateValues = async () => {
@@ -32,10 +37,52 @@ const AssetsPage: React.FC = () => {
     calculateValues();
   }, [data.assets, data.stockHoldings, data.cryptoHoldings]);
 
+  const handleRefreshUsdAssets = async () => {
+    if (refreshingUsdAssets || usdAssetCount === 0) {
+      return;
+    }
+
+    setRefreshingUsdAssets(true);
+    setUsdRefreshMessage(null);
+
+    try {
+      const usdToMyrRate = await getUSDToMYRRate();
+      const updates = buildUsdAssetRefreshUpdates(data.assets, usdToMyrRate);
+
+      updates.forEach((update) => {
+        updateAsset(update.id, update.asset);
+      });
+
+      setUsdRefreshMessage(
+        updates.length > 0
+          ? `Updated ${updates.length} USD asset${updates.length === 1 ? '' : 's'} with rate ${usdToMyrRate.toFixed(4)}.`
+          : 'No USD assets to update.',
+      );
+    } catch (error) {
+      console.error('Error refreshing USD asset rates:', error);
+      setUsdRefreshMessage('Failed to refresh USD currency rate.');
+    } finally {
+      setRefreshingUsdAssets(false);
+    }
+  };
+
   return (
     <div className={styles.page}>
       <div className={styles.pageHeader}>
-        <h1 className={styles.pageTitle}>Assets</h1>
+        <div className={styles.pageHeaderTop}>
+          <h1 className={styles.pageTitle}>Assets</h1>
+          <button
+            type="button"
+            className={styles.refreshButton}
+            onClick={handleRefreshUsdAssets}
+            disabled={refreshingUsdAssets || usdAssetCount === 0}
+          >
+            {refreshingUsdAssets ? 'Refreshing USD...' : 'Refresh USD Currency'}
+          </button>
+        </div>
+        {usdRefreshMessage && (
+          <p className={styles.refreshStatusText}>{usdRefreshMessage}</p>
+        )}
         <div className={styles.assetsSummary}>
           <div className={styles.summaryCard}>
             <span className={styles.summaryLabel}>Current Assets:</span>
