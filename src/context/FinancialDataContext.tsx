@@ -6,6 +6,7 @@ import { getStockPrices } from '../services/stockPriceService';
 import { getCryptoPrices } from '../services/cryptoPriceService';
 import { getHKDToMYRRate, getUSDToMYRRate } from '../services/exchangeRateService';
 import { useAuth } from './AuthContext';
+import { shouldSkipBackgroundRefresh } from './refreshGuards';
 
 interface FinancialDataContextType {
   data: FinancialData;
@@ -96,11 +97,20 @@ export const FinancialDataProvider: React.FC<{ children: ReactNode }> = ({ child
   const [data, setData] = useState<FinancialData>(getDefaultData());
   const [isLoading, setIsLoading] = useState(true);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const saveInFlightRef = useRef(false);
   const initialRefreshRef = useRef<{ userId: string | null; inFlight: boolean }>({ userId: null, inFlight: false });
   const activeUserIdRef = useRef<string | null>(null);
   const loadingDataRef = useRef(false);
 
   const refreshDataFromServer = useCallback(async (userId: string, blockUi: boolean) => {
+    if (shouldSkipBackgroundRefresh({
+      blockUi,
+      hasPendingSaveTimeout: saveTimeoutRef.current !== null,
+      isSaveInFlight: saveInFlightRef.current,
+    })) {
+      return;
+    }
+
     if (loadingDataRef.current) {
       return;
     }
@@ -300,19 +310,27 @@ export const FinancialDataProvider: React.FC<{ children: ReactNode }> = ({ child
     // Clear existing timeout
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
+      saveTimeoutRef.current = null;
     }
 
     // Set new timeout for debounced save
     saveTimeoutRef.current = setTimeout(() => {
-      saveFinancialData(user.id, data).catch((error) => {
-        console.error('Error saving financial data:', error);
-      });
+      saveTimeoutRef.current = null;
+      saveInFlightRef.current = true;
+      saveFinancialData(user.id, data)
+        .catch((error) => {
+          console.error('Error saving financial data:', error);
+        })
+        .finally(() => {
+          saveInFlightRef.current = false;
+        });
     }, 1000); // 1 second debounce
 
     // Cleanup on unmount
     return () => {
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
+        saveTimeoutRef.current = null;
       }
     };
   }, [data, isLoading, user]);
@@ -679,4 +697,5 @@ export const useFinancialData = (): FinancialDataContextType => {
   }
   return context;
 };
+
 

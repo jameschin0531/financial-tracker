@@ -3,6 +3,7 @@ import { useFinancialData } from '../../context/FinancialDataContext';
 import type { Expense, Currency } from '../../types/financial';
 import { getUSDToMYRRate } from '../../services/exchangeRateService';
 import styles from './Forms.module.css';
+import { preventNumberInputScroll } from './IncomeForm';
 
 interface ExpenseFormProps {
   editingExpense?: Expense;
@@ -243,6 +244,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ editingExpense, onCancel }) =
             min="0"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
+            onWheel={preventNumberInputScroll}
             className={styles.input}
             placeholder="0.00"
           />
@@ -299,3 +301,4 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ editingExpense, onCancel }) =
 };
 
 export default ExpenseForm;
+

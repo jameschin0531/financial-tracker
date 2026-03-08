@@ -17,6 +17,14 @@ interface IncomeFormProps {
   onCancel?: () => void;
 }
 
+export const preventNumberInputScroll = (event: React.WheelEvent<HTMLInputElement>): void => {
+  if (event.currentTarget.type !== 'number') {
+    return;
+  }
+
+  event.currentTarget.blur();
+};
+
 const IncomeForm: React.FC<IncomeFormProps> = ({ editingIncome, onCancel }) => {
   const { addIncome, updateIncome } = useFinancialData();
   const [source, setSource] = useState(editingIncome?.source || '');
@@ -190,6 +198,7 @@ const IncomeForm: React.FC<IncomeFormProps> = ({ editingIncome, onCancel }) => {
             min="0"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
+            onWheel={preventNumberInputScroll}
             className={styles.input}
             placeholder="0.00"
           />
@@ -248,3 +257,4 @@ const IncomeForm: React.FC<IncomeFormProps> = ({ editingIncome, onCancel }) => {
 };
 
 export default IncomeForm;
+
