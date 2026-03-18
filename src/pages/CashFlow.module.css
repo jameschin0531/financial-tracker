@@ -4,11 +4,10 @@
 
 .tableContainer {
   overflow-x: auto;
-  background: var(--gradient-primary), var(--bg-card);
-  backdrop-filter: blur(20px);
-  border-radius: 14px;
+  background: var(--bg-card);
+  border-radius: 12px;
   padding: 1.5rem;
-  box-shadow: 0 8px 24px var(--shadow);
+  box-shadow: 0 4px 20px var(--shadow);
   border: 1px solid var(--border-color);
 }
 
@@ -52,6 +51,50 @@
   min-width: 180px;
 }
 
+.cashFlowTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+}
+
+.cashFlowTable thead {
+  background: var(--bg-secondary);
+  border-bottom: 2px solid var(--border-color);
+}
+
+.cashFlowTable th {
+  padding: 1rem 1.25rem;
+  text-align: left;
+  font-weight: 600;
+  color: var(--text-primary);
+  text-transform: uppercase;
+  font-size: 0.85rem;
+  letter-spacing: 0.5px;
+}
+
+.cashFlowTable td {
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border-color);
+  color: var(--text-primary);
+}
+
+.cashFlowTable tbody tr {
+  transition: background-color 0.2s ease;
+}
+
+.cashFlowTable tbody tr:hover {
+  background: var(--bg-hover);
+}
+
+.colNo {
+  width: 60px;
+  text-align: center;
+}
+
+.colItem {
+  min-width: 180px;
+}
+
 .colRemark {
   min-width: 160px;
   color: var(--text-secondary);
@@ -60,12 +103,18 @@
 .colIncome {
   width: 150px;
   text-align: right;
+  font-family: 'Fira Code', monospace;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
   color: var(--success-color);
 }
 
 .colExpense {
   width: 150px;
   text-align: right;
+  font-family: 'Fira Code', monospace;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
   color: var(--danger-color);
 }
 
@@ -118,7 +167,7 @@
 }
 
 .balanceRow {
-  background: rgba(245, 158, 11, 0.16);
+  background: rgba(14, 165, 233, 0.12);
   font-weight: 700;
   font-size: 1.1rem;
 }

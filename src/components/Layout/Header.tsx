@@ -39,7 +39,6 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
               />
             </svg>
           </button>
-          <span className={styles.marketBadge}>Crypto Desk</span>
         </div>
         <div className={styles.headerActions}>
           {user && (

@@ -228,33 +228,40 @@ const NetWorthChart: React.FC = () => {
       )}
       <ResponsiveContainer width="100%" height={300}>
         <LineChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
+          <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" strokeOpacity={0.3} vertical={false} />
           <XAxis
             dataKey="date"
             stroke="var(--text-secondary)"
             style={{ fontSize: '0.75rem' }}
+            axisLine={false}
+            tickLine={false}
           />
           <YAxis
             stroke="var(--text-secondary)"
             style={{ fontSize: '0.75rem' }}
             tickFormatter={(value) => formatCurrency(value)}
+            axisLine={false}
+            tickLine={false}
           />
           <Tooltip
             contentStyle={{
               backgroundColor: 'var(--bg-card)',
               border: '1px solid var(--border-color)',
-              borderRadius: '4px',
+              borderRadius: '12px',
+              boxShadow: '0 8px 32px var(--shadow)',
+              padding: '12px 16px',
             }}
             formatter={(value: number) => formatCurrency(value)}
+            cursor={{ stroke: 'var(--border-color)', strokeWidth: 1, strokeDasharray: '4 4' }}
           />
-          <Legend />
+          <Legend wrapperStyle={{ paddingTop: '20px' }} />
           <Line
             type="monotone"
             dataKey="Net Worth"
             stroke="var(--accent-color)"
-            strokeWidth={2}
-            dot={{ fill: 'var(--accent-color)', r: 4 }}
-            activeDot={{ r: 6 }}
+            strokeWidth={3}
+            dot={{ fill: 'var(--bg-card)', stroke: 'var(--accent-color)', strokeWidth: 2, r: 4 }}
+            activeDot={{ r: 6, strokeWidth: 0, fill: 'var(--accent-color)' }}
           />
         </LineChart>
       </ResponsiveContainer>

@@ -117,6 +117,17 @@
   box-sizing: border-box;
 }
 
+
+.assetsSummary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
 .summaryLabel {
   font-size: 0.95rem;
   color: var(--text-secondary);
@@ -126,6 +137,9 @@
 .summaryValue {
   font-size: clamp(0.9rem, 2vw, 1.2rem);
   font-weight: 700;
+  font-family: 'Fira Code', monospace;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
   background: var(--gradient-accent);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -408,6 +422,9 @@
 .listItemValue {
   font-size: 1.125rem;
   font-weight: 600;
+  font-family: 'Fira Code', monospace;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
   color: var(--text-primary);
 }
 

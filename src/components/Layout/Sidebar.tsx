@@ -1,4 +1,5 @@
 import React from 'react';
+import { useAuth } from '../../context/AuthContext';
 import styles from './Sidebar.module.css';
 
 interface SidebarProps {
@@ -52,6 +53,7 @@ const renderIcon = (icon: MenuIcon) => {
 };
 
 const Sidebar: React.FC<SidebarProps> = ({ currentPage, onPageChange }) => {
+  const { user } = useAuth();
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: 'dashboard' as const },
     { id: 'assets', label: 'Assets', icon: 'assets' as const },
@@ -64,8 +66,8 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, onPageChange }) => {
   return (
     <aside className={styles.sidebar}>
       <div className={styles.sidebarHeader}>
-        <h2 className={styles.sidebarTitle}>Financial Tracker</h2>
-        <p className={styles.sidebarSubtitle}>Market Operations</p>
+        <h2 className={styles.sidebarTitle}>Financial Suite</h2>
+        <p className={styles.sidebarSubtitle}>{user?.email || 'Guest'}</p>
       </div>
       <nav className={styles.nav}>
         <ul className={styles.navList}>

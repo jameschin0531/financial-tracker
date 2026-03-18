@@ -21,19 +21,7 @@ body {
   background: var(--bg-primary);
 }
 
-body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  background:
-    radial-gradient(circle at 12% 18%, rgba(251, 191, 36, 0.14) 0%, transparent 45%),
-    radial-gradient(circle at 84% 12%, rgba(34, 211, 238, 0.12) 0%, transparent 42%),
-    radial-gradient(circle at 75% 78%, rgba(16, 185, 129, 0.08) 0%, transparent 40%);
-  background-size: 130% 130%;
-  animation: terminalGlow 18s ease-in-out infinite;
-  pointer-events: none;
-  z-index: -2;
-}
+
 
 body::after {
   content: '';
@@ -49,7 +37,7 @@ body::after {
 }
 
 ::selection {
-  background: rgba(251, 191, 36, 0.3);
+  background: rgba(14, 165, 233, 0.3);
 }
 
 .appLoading {
@@ -72,15 +60,7 @@ body::after {
   animation: spin 0.8s linear infinite;
 }
 
-@keyframes terminalGlow {
-  0%,
-  100% {
-    background-position: 0% 50%;
-  }
-  50% {
-    background-position: 100% 50%;
-  }
-}
+
 
 @keyframes spin {
   to {
@@ -88,9 +68,8 @@ body::after {
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  body::before {
-    animation: none;
-  }
+.amount-value {
+  font-family: 'Fira Code', monospace;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
 }
-

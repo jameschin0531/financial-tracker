@@ -93,15 +93,11 @@
 }
 
 .metricsCard {
-  background: var(--gradient-primary), var(--bg-card);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  background: var(--bg-card);
   border: 1px solid var(--border-color);
-  border-radius: 14px;
+  border-radius: 16px;
   padding: 1.5rem;
-  box-shadow: 
-    0 8px 32px var(--shadow),
-    0 0 0 1px rgba(255, 255, 255, 0.05) inset;
+  box-shadow: 0 4px 24px var(--shadow);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   overflow: hidden;
   word-wrap: break-word;
@@ -109,46 +105,11 @@
   position: relative;
 }
 
-.metricsCard::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: var(--gradient-accent);
-  opacity: 0;
-  transition: opacity 0.3s ease;
-}
-
-.metricsCard::after {
-  content: '';
-  position: absolute;
-  top: -50%;
-  right: -50%;
-  width: 200%;
-  height: 200%;
-  background: radial-gradient(circle, var(--accent-glow) 0%, transparent 70%);
-  opacity: 0;
-  transition: opacity 0.3s ease;
-  pointer-events: none;
-}
-
 .metricsCard:hover {
-  transform: translateY(-2px);
-  box-shadow: 
-    0 12px 40px var(--shadow),
-    0 0 20px var(--accent-glow),
-    0 0 0 1px rgba(255, 255, 255, 0.1) inset;
-  background: var(--gradient-primary), var(--bg-card-hover);
-}
-
-.metricsCard:hover::before {
-  opacity: 1;
-}
-
-.metricsCard:hover::after {
-  opacity: 0.3;
+  transform: translateY(-4px);
+  box-shadow: 0 12px 32px var(--shadow), 0 0 20px var(--accent-glow);
+  background: var(--bg-card-hover);
+  border-color: var(--border-strong);
 }
 
 .metricsTitle {
@@ -163,6 +124,9 @@
 }
 
 .metricsValue {
+  font-family: 'Fira Code', monospace;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
   font-size: clamp(1rem, 2.5vw, 1.5rem);
   font-weight: 600;
   color: var(--text-primary);
@@ -180,19 +144,11 @@
 }
 
 .metricsValue.trend-positive {
-  background: var(--gradient-success);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  text-shadow: 0 0 10px var(--success-glow);
+  color: var(--success-color);
 }
 
 .metricsValue.trend-negative {
-  background: var(--gradient-danger);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  text-shadow: 0 0 10px var(--danger-glow);
+  color: var(--danger-color);
 }
 
 .metricsSubtitle {
@@ -211,54 +167,21 @@
 }
 
 .chartCard {
-  background: var(--gradient-primary), var(--bg-card);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  background: var(--bg-card);
   border: 1px solid var(--border-color);
-  border-radius: 14px;
+  border-radius: 16px;
   padding: 1.5rem;
-  box-shadow: 
-    0 8px 32px var(--shadow),
-    0 0 0 1px rgba(255, 255, 255, 0.05) inset;
+  box-shadow: 0 4px 24px var(--shadow);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
   overflow: hidden;
 }
 
-.chartCard::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: var(--gradient-accent);
-  opacity: 0.5;
-}
-
-.chartCard::after {
-  content: '';
-  position: absolute;
-  top: -50%;
-  right: -50%;
-  width: 200%;
-  height: 200%;
-  background: radial-gradient(circle, var(--accent-glow) 0%, transparent 70%);
-  opacity: 0;
-  transition: opacity 0.3s ease;
-  pointer-events: none;
-}
-
 .chartCard:hover {
-  transform: translateY(-1px);
-  box-shadow: 
-    0 12px 40px var(--shadow),
-    0 0 20px var(--accent-glow);
-  background: var(--gradient-primary), var(--bg-card-hover);
-}
-
-.chartCard:hover::after {
-  opacity: 0.2;
+  transform: translateY(-4px);
+  box-shadow: 0 12px 32px var(--shadow), 0 0 20px var(--accent-glow);
+  background: var(--bg-card-hover);
+  border-color: var(--border-strong);
 }
 
 .chartTitle {
@@ -304,9 +227,9 @@
   gap: 0.75rem;
   align-items: center;
   border: 1px solid var(--border-color);
-  border-radius: 10px;
+  border-radius: 4px;
   padding: 0.45rem 0.6rem;
-  background: color-mix(in srgb, var(--bg-card) 85%, transparent);
+  background: var(--bg-card);
 }
 
 .allocationCategory {

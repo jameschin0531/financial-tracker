@@ -68,8 +68,8 @@
 .updateButton {
   padding: 0.68rem 1.1rem;
   background: var(--gradient-accent);
-  color: #0f172a;
-  border: 1px solid rgba(245, 158, 11, 0.6);
+  color: white;
+  border: 1px solid var(--accent-color);
   border-radius: 10px;
   font-size: 0.9rem;
   font-weight: 600;
@@ -78,7 +78,7 @@
   display: flex;
   align-items: center;
   gap: 0.3rem;
-  box-shadow: 0 8px 20px var(--accent-glow);
+  box-shadow: none;
 }
 
 .updateButton:hover:not(:disabled) {
@@ -98,12 +98,22 @@
 }
 
 .summaryCard {
-  background: var(--gradient-primary), var(--bg-card);
+  background: var(--bg-card);
   border: 1px solid var(--border-color);
-  border-radius: 12px;
+  border-radius: 16px;
   padding: 1.25rem 1.5rem;
-  box-shadow: 0 8px 20px var(--shadow);
+  box-shadow: 0 4px 24px var(--shadow);
   min-width: 200px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.summaryCard:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 32px var(--shadow), 0 0 20px var(--accent-glow);
+  background: var(--bg-card-hover);
+  border-color: var(--border-strong);
 }
 
 .summaryLabel {
@@ -117,6 +127,9 @@
   display: block;
   font-size: 1.75rem;
   font-weight: 700;
+  font-family: 'Fira Code', monospace;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
   color: var(--accent-color);
   margin-bottom: 0.25rem;
 }
@@ -140,12 +153,12 @@
 }
 
 .section {
-  background: var(--gradient-primary), var(--bg-card);
+  background: var(--bg-card);
   border: 1px solid var(--border-color);
-  border-radius: 14px;
+  border-radius: 16px;
   padding: 1.5rem;
   margin-bottom: 2rem;
-  box-shadow: 0 8px 22px var(--shadow);
+  box-shadow: 0 4px 20px var(--shadow);
 }
 
 .sectionHeader {
@@ -195,7 +208,7 @@
 .accountsTable th,
 .depositsTable th {
   background: var(--bg-secondary);
-  padding: 0.75rem;
+  padding: 1rem 1.25rem;
   text-align: left;
   font-weight: 600;
   color: var(--text-primary);
@@ -207,9 +220,15 @@
 .holdingsTable td,
 .accountsTable td,
 .depositsTable td {
-  padding: 0.75rem;
+  padding: 1rem 1.25rem;
   border-bottom: 1px solid var(--border-color);
   color: var(--text-primary);
+}
+
+.holdingsTable tr,
+.accountsTable tr,
+.depositsTable tr {
+  transition: background-color 0.2s ease;
 }
 
 .holdingsTable tr:hover,
@@ -232,11 +251,17 @@
 .positive {
   color: var(--success-color);
   font-weight: 600;
+  font-family: 'Fira Code', monospace;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
 }
 
 .negative {
   color: var(--danger-color);
   font-weight: 600;
+  font-family: 'Fira Code', monospace;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
 }
 
 .noPrice {
@@ -313,12 +338,18 @@
 .allocationValue {
   font-size: 1.5rem;
   font-weight: 700;
+  font-family: 'Fira Code', monospace;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
   color: var(--text-primary);
 }
 
 .allocationPercentage {
   font-size: 1.1rem;
   font-weight: 600;
+  font-family: 'Fira Code', monospace;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
   color: var(--accent-color);
 }
 
