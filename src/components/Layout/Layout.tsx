@@ -12,6 +12,7 @@ interface LayoutProps {
 
 const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageChange, amountVisibility }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   const handlePageChange = (page: string) => {
     onPageChange(page);
@@ -20,9 +21,14 @@ const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageChange, am
 
   return (
     <div className={styles.layout} data-amount-visibility={amountVisibility}>
-      <div className={styles.sidebarWrapper}>
+      <div className={`${styles.sidebarWrapper} ${sidebarCollapsed ? styles.sidebarCollapsed : ''}`}>
         <div className={`${styles.sidebarContainer} ${sidebarOpen ? styles.sidebarOpen : ''}`}>
-          <Sidebar currentPage={currentPage} onPageChange={handlePageChange} />
+          <Sidebar
+            currentPage={currentPage}
+            onPageChange={handlePageChange}
+            collapsed={sidebarCollapsed}
+            onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
+          />
         </div>
         {sidebarOpen && (
           <div
@@ -43,4 +49,3 @@ const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageChange, am
 };
 
 export default Layout;
-

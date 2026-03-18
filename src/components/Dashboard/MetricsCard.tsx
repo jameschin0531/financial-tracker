@@ -6,11 +6,13 @@ interface MetricsCardProps {
   value: string;
   subtitle?: string;
   trend?: 'positive' | 'negative' | 'neutral';
+  icon?: React.ReactNode;
 }
 
-const MetricsCard: React.FC<MetricsCardProps> = ({ title, value, subtitle, trend = 'neutral' }) => {
+const MetricsCard: React.FC<MetricsCardProps> = ({ title, value, subtitle, trend = 'neutral', icon }) => {
   return (
     <div className={styles.metricsCard}>
+      {icon && <div className={styles.metricsIcon}>{icon}</div>}
       <h3 className={styles.metricsTitle}>{title}</h3>
       <div className={`${styles.metricsValue} ${styles[`trend-${trend}`]}`} title={value}>
         {value}
@@ -21,4 +23,3 @@ const MetricsCard: React.FC<MetricsCardProps> = ({ title, value, subtitle, trend
 };
 
 export default MetricsCard;
-

@@ -8,10 +8,10 @@ const COLORS = [
   'var(--accent-color)',
   'var(--success-color)',
   'var(--warning-color)',
-  '#22d3ee',
+  '#c4b5fd',
   '#f97316',
-  '#38bdf8',
-  '#06b6d4',
+  '#7c3aed',
+  '#6d28d9',
   '#fb7185',
 ];
 

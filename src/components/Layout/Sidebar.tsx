@@ -5,6 +5,8 @@ import styles from './Sidebar.module.css';
 interface SidebarProps {
   currentPage: string;
   onPageChange: (page: string) => void;
+  collapsed?: boolean;
+  onToggleCollapse?: () => void;
 }
 
 type MenuIcon = 'dashboard' | 'assets' | 'liabilities' | 'cashflow' | 'stocks' | 'crypto';
@@ -52,7 +54,7 @@ const renderIcon = (icon: MenuIcon) => {
   }
 };
 
-const Sidebar: React.FC<SidebarProps> = ({ currentPage, onPageChange }) => {
+const Sidebar: React.FC<SidebarProps> = ({ currentPage, onPageChange, collapsed = false, onToggleCollapse }) => {
   const { user } = useAuth();
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: 'dashboard' as const },
@@ -64,10 +66,10 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, onPageChange }) => {
   ];
 
   return (
-    <aside className={styles.sidebar}>
+    <aside className={`${styles.sidebar} ${collapsed ? styles.collapsed : ''}`}>
       <div className={styles.sidebarHeader}>
-        <h2 className={styles.sidebarTitle}>Financial Suite</h2>
-        <p className={styles.sidebarSubtitle}>{user?.email || 'Guest'}</p>
+        <h2 className={styles.sidebarTitle}>{collapsed ? 'FS' : 'Financial Suite'}</h2>
+        {!collapsed && <p className={styles.sidebarSubtitle}>{user?.email || 'Guest'}</p>}
       </div>
       <nav className={styles.nav}>
         <ul className={styles.navList}>
@@ -77,17 +79,30 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, onPageChange }) => {
                 className={`${styles.navItem} ${currentPage === item.id ? styles.active : ''}`}
                 onClick={() => onPageChange(item.id)}
                 aria-current={currentPage === item.id ? 'page' : undefined}
+                title={collapsed ? item.label : undefined}
               >
                 <span className={styles.navIcon}>{renderIcon(item.icon)}</span>
-                <span className={styles.navLabel}>{item.label}</span>
+                {!collapsed && <span className={styles.navLabel}>{item.label}</span>}
               </button>
             </li>
           ))}
         </ul>
       </nav>
+      {onToggleCollapse && (
+        <button
+          className={styles.collapseToggle}
+          onClick={onToggleCollapse}
+          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        >
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"
+            style={{ transform: collapsed ? 'rotate(180deg)' : 'none', transition: 'transform 0.3s ease' }}>
+            <path d="M15 19l-7-7 7-7" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
+      )}
     </aside>
   );
 };
 
 export default Sidebar;
-

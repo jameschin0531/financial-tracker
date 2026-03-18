@@ -1,15 +1,27 @@
 import React, { useState } from 'react';
 import { useFinancialData } from '../context/FinancialDataContext';
+import { useToast } from '../context/ToastContext';
 import { Liability } from '../types/financial';
 import LiabilityForm from '../components/Forms/LiabilityForm';
+import ConfirmModal from '../components/Layout/ConfirmModal';
 import { calculateTotalLiabilities } from '../services/calculations';
 import { formatCurrency, formatCurrencyWithRate } from '../utils/formatters';
 import styles from './Pages.module.css';
 
 const LiabilitiesPage: React.FC = () => {
   const { data, deleteLiability } = useFinancialData();
+  const { showToast } = useToast();
   const [editingLiability, setEditingLiability] = useState<Liability | undefined>(undefined);
+  const [deleteTarget, setDeleteTarget] = useState<Liability | null>(null);
   const totalLiabilities = calculateTotalLiabilities(data.liabilities);
+
+  const handleConfirmDelete = () => {
+    if (deleteTarget) {
+      deleteLiability(deleteTarget.id);
+      showToast(`Deleted "${deleteTarget.name}"`, 'success');
+      setDeleteTarget(null);
+    }
+  };
 
   return (
     <div className={styles.page}>
@@ -37,7 +49,13 @@ const LiabilitiesPage: React.FC = () => {
             <h2 className={styles.sectionTitle}>Your Liabilities ({data.liabilities.length})</h2>
             {data.liabilities.length === 0 ? (
               <div className={styles.emptyState}>
-                <p>No liabilities added yet. Add your first liability using the form on the left.</p>
+                <div className={styles.emptyStateIcon}>
+                  <svg viewBox="0 0 24 24" width="48" height="48" aria-hidden="true">
+                    <path d="M3 7.5A2.5 2.5 0 015.5 5h13A2.5 2.5 0 0121 7.5v9a2.5 2.5 0 01-2.5 2.5h-13A2.5 2.5 0 013 16.5v-9zm2 2v5h14v-5H5zm9 1.5a1 1 0 100 2h3a1 1 0 100-2h-3z" fill="currentColor" opacity="0.3" />
+                  </svg>
+                </div>
+                <p className={styles.emptyStateTitle}>No liabilities yet</p>
+                <p className={styles.emptyStateText}>Add your first liability using the form to track what you owe.</p>
               </div>
             ) : (
               <div className={styles.list}>
@@ -73,7 +91,7 @@ const LiabilitiesPage: React.FC = () => {
                       </button>
                       <button
                         className={styles.deleteButton}
-                        onClick={() => deleteLiability(liability.id)}
+                        onClick={() => setDeleteTarget(liability)}
                         aria-label="Delete liability"
                         title="Delete liability"
                       >
@@ -87,9 +105,17 @@ const LiabilitiesPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {deleteTarget && (
+        <ConfirmModal
+          title="Delete Liability"
+          message={`Are you sure you want to delete "${deleteTarget.name}"? This action cannot be undone.`}
+          onConfirm={handleConfirmDelete}
+          onCancel={() => setDeleteTarget(null)}
+        />
+      )}
     </div>
   );
 };
 
 export default LiabilitiesPage;
-

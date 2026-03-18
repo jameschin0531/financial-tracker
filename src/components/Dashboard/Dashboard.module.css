@@ -105,6 +105,25 @@
   position: relative;
 }
 
+.metricsIcon {
+  position: absolute;
+  top: 1.25rem;
+  right: 1.25rem;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--accent-glow);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent-color);
+}
+
+.metricsIcon svg {
+  width: 18px;
+  height: 18px;
+}
+
 .metricsCard:hover {
   transform: translateY(-4px);
   box-shadow: 0 12px 32px var(--shadow), 0 0 20px var(--accent-glow);

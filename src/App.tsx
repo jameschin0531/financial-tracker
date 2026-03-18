@@ -3,6 +3,7 @@ import { ThemeProvider } from './context/ThemeContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { FinancialDataProvider } from './context/FinancialDataContext';
 import { AmountVisibilityProvider, useAmountVisibility } from './context/AmountVisibilityContext';
+import { ToastProvider } from './context/ToastContext';
 import Layout from './components/Layout/Layout';
 import Dashboard from './components/Dashboard/Dashboard';
 import AssetsPage from './pages/AssetsPage';
@@ -65,11 +66,13 @@ function AppContent() {
 function App() {
   return (
     <ThemeProvider>
-      <AuthProvider>
-        <AmountVisibilityProvider>
-          <AppContent />
-        </AmountVisibilityProvider>
-      </AuthProvider>
+      <ToastProvider>
+        <AuthProvider>
+          <AmountVisibilityProvider>
+            <AppContent />
+          </AmountVisibilityProvider>
+        </AuthProvider>
+      </ToastProvider>
     </ThemeProvider>
   );
 }

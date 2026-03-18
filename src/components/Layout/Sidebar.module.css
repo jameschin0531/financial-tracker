@@ -10,13 +10,23 @@
   flex-direction: column;
   z-index: 12;
   overflow: hidden;
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-
+.sidebar.collapsed {
+  width: 64px;
+}
 
 .sidebarHeader {
   padding: 1.5rem 1.25rem 1.1rem;
   border-bottom: 1px solid var(--border-color);
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.collapsed .sidebarHeader {
+  padding: 1.5rem 0.75rem 1.1rem;
+  text-align: center;
 }
 
 .sidebarTitle {
@@ -24,6 +34,11 @@
   font-weight: 700;
   margin: 0;
   color: var(--text-primary);
+  transition: font-size 0.3s ease;
+}
+
+.collapsed .sidebarTitle {
+  font-size: 1rem;
 }
 
 .sidebarSubtitle {
@@ -39,6 +54,10 @@
   padding: 0.8rem 0.75rem;
   overflow-y: auto;
   overflow-x: hidden;
+}
+
+.collapsed .nav {
+  padding: 0.8rem 0.5rem;
 }
 
 .nav::-webkit-scrollbar {
@@ -74,6 +93,14 @@
   gap: 0.68rem;
   text-align: left;
   transition: all 0.15s ease;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.collapsed .navItem {
+  justify-content: center;
+  padding: 0.72rem 0;
+  gap: 0;
 }
 
 .navItem:hover {
@@ -93,6 +120,12 @@
   border-radius: 0 4px 4px 0;
 }
 
+.collapsed .navItem.active {
+  border-left: none;
+  border-bottom: 2px solid var(--accent-color);
+  border-radius: 4px;
+}
+
 .navIcon {
   width: 20px;
   height: 20px;
@@ -100,6 +133,7 @@
   align-items: center;
   justify-content: center;
   color: currentColor;
+  flex-shrink: 0;
 }
 
 .navIcon svg {
@@ -111,9 +145,36 @@
   flex: 1;
 }
 
+.collapseToggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 0.85rem;
+  border: none;
+  border-top: 1px solid var(--border-color);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.collapseToggle:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
 @media (max-width: 768px) {
   .sidebar {
     width: 280px;
     box-shadow: 16px 0 30px rgba(2, 6, 23, 0.45);
+  }
+
+  .sidebar.collapsed {
+    width: 280px;
+  }
+
+  .collapseToggle {
+    display: none;
   }
 }

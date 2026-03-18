@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useFinancialData } from '../context/FinancialDataContext';
+import { useToast } from '../context/ToastContext';
 import type { Asset } from '../types/financial';
 import AssetForm from '../components/Forms/AssetForm';
+import ConfirmModal from '../components/Layout/ConfirmModal';
 import { calculateTotalAssets, calculateCurrentAssets, calculateFixedAssets } from '../services/calculations';
 import { calculateTotalPortfolioValue } from '../services/stockCalculations';
 import { calculateTotalCryptoPortfolioValue } from '../services/cryptoCalculations';
@@ -12,12 +14,14 @@ import styles from './Pages.module.css';
 
 const AssetsPage: React.FC = () => {
   const { data, deleteAsset, updateAsset } = useFinancialData();
+  const { showToast } = useToast();
   const [editingAsset, setEditingAsset] = useState<Asset | undefined>(undefined);
   const [totalAssets, setTotalAssets] = useState(0);
   const [stockPortfolioValue, setStockPortfolioValue] = useState(0);
   const [cryptoPortfolioValue, setCryptoPortfolioValue] = useState(0);
   const [refreshingUsdAssets, setRefreshingUsdAssets] = useState(false);
   const [usdRefreshMessage, setUsdRefreshMessage] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Asset | null>(null);
   
   const currentAssets = calculateCurrentAssets(data.assets);
   const fixedAssets = calculateFixedAssets(data.assets);
@@ -53,16 +57,25 @@ const AssetsPage: React.FC = () => {
         updateAsset(update.id, update.asset);
       });
 
-      setUsdRefreshMessage(
-        updates.length > 0
-          ? `Updated ${updates.length} USD asset${updates.length === 1 ? '' : 's'} with rate ${usdToMyrRate.toFixed(4)}.`
-          : 'No USD assets to update.',
-      );
+      const msg = updates.length > 0
+        ? `Updated ${updates.length} USD asset${updates.length === 1 ? '' : 's'} with rate ${usdToMyrRate.toFixed(4)}.`
+        : 'No USD assets to update.';
+      setUsdRefreshMessage(msg);
+      showToast(msg, 'success');
     } catch (error) {
       console.error('Error refreshing USD asset rates:', error);
       setUsdRefreshMessage('Failed to refresh USD currency rate.');
+      showToast('Failed to refresh USD currency rate.', 'error');
     } finally {
       setRefreshingUsdAssets(false);
+    }
+  };
+
+  const handleConfirmDelete = () => {
+    if (deleteTarget) {
+      deleteAsset(deleteTarget.id);
+      showToast(`Deleted "${deleteTarget.name}"`, 'success');
+      setDeleteTarget(null);
     }
   };
 
@@ -138,7 +151,13 @@ const AssetsPage: React.FC = () => {
             <h2 className={styles.sectionTitle}>Your Assets ({data.assets.length})</h2>
             {data.assets.length === 0 ? (
               <div className={styles.emptyState}>
-                <p>No assets added yet. Add your first asset using the form on the left.</p>
+                <div className={styles.emptyStateIcon}>
+                  <svg viewBox="0 0 24 24" width="48" height="48" aria-hidden="true">
+                    <path d="M12 3a9 9 0 100 18 9 9 0 000-18zm1 4v1.1a3 3 0 012.4 2.2.8.8 0 11-1.55.37c-.2-.86-.9-1.37-1.85-1.37-.98 0-1.73.52-1.73 1.22 0 .65.38.97 1.9 1.36 1.8.47 3.46 1.03 3.46 3.14 0 1.59-1.1 2.74-2.63 3.06V18a.8.8 0 11-1.6 0v-1.04a3.33 3.33 0 01-2.96-2.74.8.8 0 111.58-.3c.22 1.12 1.14 1.73 2.34 1.73 1.03 0 1.9-.54 1.9-1.37 0-.8-.62-1.15-2.26-1.58-1.64-.43-3.1-1.01-3.1-2.95 0-1.48 1.07-2.57 2.55-2.9V7a.8.8 0 111.6 0z" fill="currentColor" opacity="0.3" />
+                  </svg>
+                </div>
+                <p className={styles.emptyStateTitle}>No assets yet</p>
+                <p className={styles.emptyStateText}>Add your first asset using the form to get started tracking your wealth.</p>
               </div>
             ) : (
               <div className={styles.list}>
@@ -169,7 +188,7 @@ const AssetsPage: React.FC = () => {
                       </button>
                       <button
                         className={styles.deleteButton}
-                        onClick={() => deleteAsset(asset.id)}
+                        onClick={() => setDeleteTarget(asset)}
                         aria-label="Delete asset"
                         title="Delete asset"
                       >
@@ -183,9 +202,17 @@ const AssetsPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {deleteTarget && (
+        <ConfirmModal
+          title="Delete Asset"
+          message={`Are you sure you want to delete "${deleteTarget.name}"? This action cannot be undone.`}
+          onConfirm={handleConfirmDelete}
+          onCancel={() => setDeleteTarget(null)}
+        />
+      )}
     </div>
   );
 };
 
 export default AssetsPage;
-

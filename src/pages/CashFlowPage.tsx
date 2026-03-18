@@ -1,8 +1,10 @@
 import React, { useState, useMemo } from 'react';
 import { useFinancialData } from '../context/FinancialDataContext';
+import { useToast } from '../context/ToastContext';
 import type { Income, Expense } from '../types/financial';
 import IncomeForm from '../components/Forms/IncomeForm';
 import ExpenseForm from '../components/Forms/ExpenseForm';
+import ConfirmModal from '../components/Layout/ConfirmModal';
 import {
   calculateMonthlyIncome,
   calculateMonthlyExpenses,
@@ -112,14 +114,28 @@ export const shouldDeleteCashFlowItem = (
 
 const CashFlowPage: React.FC = () => {
   const { data, deleteIncome, deleteExpense } = useFinancialData();
+  const { showToast } = useToast();
   const [editingIncome, setEditingIncome] = useState<Income | undefined>(undefined);
   const [editingExpense, setEditingExpense] = useState<Expense | undefined>(undefined);
+  const [deleteTarget, setDeleteTarget] = useState<CashFlowTableItem | null>(null);
 
   const monthlyIncome = calculateMonthlyIncome(data.income);
   const monthlyExpenses = calculateMonthlyExpenses(data.expenses);
   const cashFlow = calculateCashFlow(data.income, data.expenses);
 
   const tableItems = useMemo(() => buildCashFlowTableItems(data.income, data.expenses), [data.income, data.expenses]);
+
+  const handleConfirmDelete = () => {
+    if (deleteTarget) {
+      if (deleteTarget.type === 'income') {
+        deleteIncome(deleteTarget.id);
+      } else {
+        deleteExpense(deleteTarget.id);
+      }
+      showToast(`Deleted "${deleteTarget.item}"`, 'success');
+      setDeleteTarget(null);
+    }
+  };
 
   return (
     <div className={styles.page}>
@@ -172,15 +188,7 @@ const CashFlowPage: React.FC = () => {
                         </button>
                         <button
                           className={cashFlowStyles.deleteButton}
-                          onClick={() => {
-                            if (shouldDeleteCashFlowItem(item.item, globalThis.confirm)) {
-                              if (item.type === 'income') {
-                                deleteIncome(item.id);
-                              } else {
-                                deleteExpense(item.id);
-                              }
-                            }
-                          }}
+                          onClick={() => setDeleteTarget(item)}
                           title="Delete"
                         >
                           Delete
@@ -245,10 +253,17 @@ const CashFlowPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {deleteTarget && (
+        <ConfirmModal
+          title={`Delete ${deleteTarget.type === 'income' ? 'Income' : 'Expense'}`}
+          message={`Are you sure you want to delete "${deleteTarget.item}"? This action cannot be undone.`}
+          onConfirm={handleConfirmDelete}
+          onCancel={() => setDeleteTarget(null)}
+        />
+      )}
     </div>
   );
 };
 
 export default CashFlowPage;
-
-
