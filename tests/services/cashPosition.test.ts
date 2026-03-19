@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { Asset } from "../../src/types/financial";
+import type { Asset, StockHolding } from "../../src/types/financial";
 import { calculateCashPosition } from "../../src/services/calculations";
 
 describe("calculateCashPosition", () => {
@@ -45,5 +45,59 @@ describe("calculateCashPosition", () => {
     ];
 
     expect(calculateCashPosition(assets)).toBe(150);
+  });
+
+  test("adds stock tracker cash holdings on top of asset cash", () => {
+    const assets: Asset[] = [
+      {
+        id: "a1",
+        name: "Wallet",
+        category: "Cash",
+        assetType: "current",
+        value: 100,
+        currency: "MYR",
+        date: "2026-03-09",
+      },
+    ];
+
+    const stockHoldings: StockHolding[] = [
+      {
+        id: "s1",
+        code: "TIGER CASH",
+        name: "Tiger Cash",
+        quantity: 1,
+        avgPrice: 20,
+        marketPrice: 20,
+        account: "Tiger",
+        stockType: "Cash",
+        currency: "USD",
+        exchangeRate: 5,
+      },
+      {
+        id: "s2",
+        code: "HKD CASH",
+        name: "HKD Cash",
+        quantity: 1,
+        avgPrice: 100,
+        marketPrice: 100,
+        account: "Futu",
+        stockType: "Cash",
+        currency: "HKD",
+        exchangeRate: 0.6,
+      },
+      {
+        id: "s3",
+        code: "AAPL",
+        quantity: 1,
+        avgPrice: 10,
+        marketPrice: 12,
+        account: "Tiger",
+        stockType: "Stock",
+        currency: "USD",
+        exchangeRate: 5,
+      },
+    ];
+
+    expect(calculateCashPosition(assets, stockHoldings)).toBe(260);
   });
 });

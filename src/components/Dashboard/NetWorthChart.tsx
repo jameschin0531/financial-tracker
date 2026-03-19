@@ -5,6 +5,7 @@ import { useAuth } from '../../context/AuthContext';
 import { buildWeeklyNetWorthSeries, getNetWorthHistory, startOfWeekISO } from '../../services/calculations';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 import { getSupabase, isSupabaseInitialized } from '../../services/supabaseClient';
+import { getNetWorthYAxisDomain } from './netWorthChartUtils';
 
 type NetWorthHistoryPoint = { date: string; netWorth: number };
 
@@ -215,6 +216,7 @@ const NetWorthChart: React.FC = () => {
     date: formatDate(item.date),
     'Net Worth': item.netWorth,
   }));
+  const [yAxisMin, yAxisMax] = getNetWorthYAxisDomain(history.map((item) => item.netWorth));
 
   const lastPoint = history[history.length - 1];
   const lastUpdatedLabel = lastPoint ? `Last updated: ${formatDate(lastPoint.date)}` : null;
@@ -239,6 +241,7 @@ const NetWorthChart: React.FC = () => {
           <YAxis
             stroke="var(--text-secondary)"
             style={{ fontSize: '0.75rem' }}
+            domain={[yAxisMin, yAxisMax]}
             tickFormatter={(value) => formatCurrency(value)}
             axisLine={false}
             tickLine={false}

@@ -1,6 +1,10 @@
-import { StockHolding, CryptoHolding, TradingAccount, Deposit, Currency } from '../types/financial';
-import { getUSDToMYRRate, getHKDToMYRRate, getUSDToHKDRate } from './exchangeRateService';
+import type { StockHolding, CryptoHolding, TradingAccount, Deposit, Currency } from '../types/financial';
+import { getUSDToMYRRate, getUSDToHKDRate } from './exchangeRateService';
 import { calculateCryptoHoldingMarketValue } from './cryptoCalculations';
+
+export const excludeCashHoldings = (holdings: StockHolding[]): StockHolding[] => {
+  return holdings.filter((holding) => holding.stockType !== 'Cash');
+};
 
 // Convert value to MYR
 const convertToMYR = (value: number, currency: Currency, exchangeRate?: number): number => {

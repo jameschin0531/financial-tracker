@@ -2,13 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { useFinancialData } from '../../context/FinancialDataContext';
 import {
   calculateTotalAssets,
-  calculateCurrentAssets,
   calculateCashPosition,
   calculateTotalLiabilities,
   calculateNetWorth,
   calculateMonthlyIncome,
 } from '../../services/calculations';
-import { calculateTotalPortfolioValue } from '../../services/stockCalculations';
+import { calculateTotalPortfolioValue, excludeCashHoldings } from '../../services/stockCalculations';
 import { calculateTotalCryptoPortfolioValue } from '../../services/cryptoCalculations';
 import { formatCurrency } from '../../utils/formatters';
 import MetricsCard from './MetricsCard';
@@ -57,7 +56,7 @@ const Dashboard: React.FC = () => {
   useEffect(() => {
     const calculateValues = async () => {
       const assets = await calculateTotalAssets(data.assets, data.stockHoldings, data.cryptoHoldings);
-      const stockValue = await calculateTotalPortfolioValue(data.stockHoldings);
+      const stockValue = await calculateTotalPortfolioValue(excludeCashHoldings(data.stockHoldings));
       const cryptoValue = await calculateTotalCryptoPortfolioValue(data.cryptoHoldings);
       const netWorthValue = await calculateNetWorth(data.assets, data.liabilities, data.stockHoldings, data.cryptoHoldings);
       
@@ -70,9 +69,8 @@ const Dashboard: React.FC = () => {
     calculateValues();
   }, [data.assets, data.liabilities, data.stockHoldings, data.cryptoHoldings]);
 
-  const currentAssets = calculateCurrentAssets(data.assets);
-  const cashPosition = calculateCashPosition(data.assets);
-  const totalCurrentAssets = currentAssets + stockPortfolioValue + cryptoPortfolioValue;
+  const cashPosition = calculateCashPosition(data.assets, data.stockHoldings);
+  const totalCurrentAssets = cashPosition + stockPortfolioValue + cryptoPortfolioValue;
   const totalLiabilities = calculateTotalLiabilities(data.liabilities);
   const monthlyIncome = calculateMonthlyIncome(data.income);
   const monthlyExpenses = data.expenses.reduce((sum, expense) => {
@@ -101,7 +99,7 @@ const Dashboard: React.FC = () => {
           <MetricsCard
             title="Cash Position"
             value={formatCurrency(cashPosition)}
-            subtitle={''}
+            subtitle={data.stockHoldings.some((holding) => holding.stockType === 'Cash') ? 'Includes broker cash' : ''}
             trend={cashPosition > 0 ? 'positive' : 'neutral'}
             icon={<IconCash />}
           />
@@ -184,28 +182,29 @@ const Dashboard: React.FC = () => {
       <div className={styles.dashboardHeader}>
         <h1 className={styles.dashboardTitle}>Financial Overview</h1>
       </div>
-      {DASHBOARD_SECTION_ORDER.map((sectionKey) => (
-        <React.Fragment key={sectionKey}>{sections[sectionKey]}</React.Fragment>
-      ))}
 
       <div className={styles.chartsGrid}>
-        <div className={styles.chartCard}>
-          <h3 className={styles.chartTitle}>Net Worth Over Time</h3>
-          <NetWorthChart />
-        </div>
+        {(cashPosition > 0 || stockPortfolioValue > 0 || cryptoPortfolioValue > 0) && (
+          <div className={styles.chartCard}>
+            <h3 className={styles.chartTitle}>Current Asset Allocation</h3>
+            <CurrentAssetAllocationChart />
+          </div>
+        )}
         {data.assets.length > 0 && (
           <div className={styles.chartCard}>
             <h3 className={styles.chartTitle}>Asset Allocation</h3>
             <AssetAllocationChart />
           </div>
         )}
-        {(data.assets.filter(a => a.assetType === 'current').length > 0 || data.stockHoldings.length > 0 || data.cryptoHoldings.length > 0) && (
-          <div className={styles.chartCard}>
-            <h3 className={styles.chartTitle}>Current Asset Allocation</h3>
-            <CurrentAssetAllocationChart />
-          </div>
-        )}
+        <div className={`${styles.chartCard} ${styles.chartCardFeatured}`}>
+          <h3 className={styles.chartTitle}>Net Worth Over Time</h3>
+          <NetWorthChart />
+        </div>
       </div>
+
+      {DASHBOARD_SECTION_ORDER.map((sectionKey) => (
+        <React.Fragment key={sectionKey}>{sections[sectionKey]}</React.Fragment>
+      ))}
     </div>
   );
 };

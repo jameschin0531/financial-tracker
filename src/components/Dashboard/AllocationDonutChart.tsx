@@ -59,15 +59,18 @@ const AllocationDonutChart: React.FC<AllocationDonutChartProps> = ({ allocation,
             <Tooltip
               contentStyle={{
                 backgroundColor: 'var(--bg-card)',
-                color: 'var(--text-primary)',
                 border: '1px solid var(--border-color)',
                 borderRadius: '8px',
+                color: 'var(--text-primary)',
               }}
+              itemStyle={{ color: 'var(--text-primary)' }}
+              labelStyle={{ color: 'var(--text-secondary)' }}
               labelFormatter={(name) => String(name)}
               formatter={(value, _name, item) => {
                 const numericValue = Number(value) || 0;
                 const percentage = Number((item as { payload?: { percentage?: number } })?.payload?.percentage ?? 0);
-                return [`${formatCurrency(numericValue)} (${percentage.toFixed(1)}%)`, ''];
+                const name = String((item as { payload?: { name?: string } })?.payload?.name ?? '');
+                return [`${formatCurrency(numericValue)} (${percentage.toFixed(1)}%)`, name];
               }}
             />
           </PieChart>

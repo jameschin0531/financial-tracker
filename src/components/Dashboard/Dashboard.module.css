@@ -178,11 +178,16 @@
 
 .chartsGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 2rem;
+  margin-bottom: 3rem;
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
+}
+
+.chartCardFeatured {
+  grid-column: 1 / -1;
 }
 
 .chartCard {
@@ -296,6 +301,17 @@
   font-weight: 600;
 }
 
+@media (max-width: 1400px) {
+  .allocationLayout {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .allocationChartCanvas {
+    min-height: 280px;
+  }
+}
+
 @media (max-width: 768px) {
   .dashboard {
     padding: 1rem;
@@ -318,6 +334,10 @@
   .chartsGrid {
     grid-template-columns: 1fr;
     gap: 1.5rem;
+  }
+
+  .chartCardFeatured {
+    grid-column: auto;
   }
 
   .chartCard {

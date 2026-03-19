@@ -1,5 +1,5 @@
 import type { Asset, Liability, Income, Expense, FinancialData, StockHolding, CryptoHolding, Currency } from '../types/financial';
-import { calculateTotalPortfolioValue } from './stockCalculations';
+import { calculateTotalPortfolioValue, excludeCashHoldings } from './stockCalculations';
 import { calculateTotalCryptoPortfolioValue } from './cryptoCalculations';
 
 // Convert value to MYR
@@ -54,12 +54,21 @@ export const calculateCurrentAssets = (assets: Asset[]): number => {
     }, 0);
 };
 
-export const calculateCashPosition = (assets: Asset[]): number => {
-  return assets
+export const calculateCashPosition = (assets: Asset[], stockHoldings: StockHolding[] = []): number => {
+  const assetCash = assets
     .filter(asset => asset.assetType === 'current' && asset.category.trim().toLowerCase() === 'cash')
     .reduce((sum, asset) => {
       return sum + convertToMYR(asset.value, asset.currency, asset.exchangeRate);
     }, 0);
+
+  const brokerCash = stockHoldings
+    .filter((holding) => holding.stockType === 'Cash')
+    .reduce((sum, holding) => {
+      const cashValue = holding.marketPrice ?? holding.avgPrice;
+      return sum + convertToMYR(cashValue, holding.currency, holding.exchangeRate);
+    }, 0);
+
+  return assetCash + brokerCash;
 };
 
 export const calculateTotalCurrentAssets = async (
@@ -379,27 +388,27 @@ export const getCurrentAssetAllocation = async (
   cryptoHoldings: CryptoHolding[] = []
 ): Promise<Array<{ name: string; value: number }>> => {
   const allocation: Record<string, number> = {};
-  
-  // Add only current assets (exclude fixed assets)
-  assets
-    .filter(asset => asset.assetType === 'current')
-    .forEach(asset => {
-      const myrValue = convertToMYR(asset.value, asset.currency, asset.exchangeRate);
-      allocation[asset.category] = (allocation[asset.category] || 0) + myrValue;
-    });
-  
-  // Add stock portfolio (considered current/liquid)
-  if (stockHoldings.length > 0) {
-    const stockValue = await calculateTotalPortfolioValue(stockHoldings);
-    allocation['Stock Portfolio'] = (allocation['Stock Portfolio'] || 0) + stockValue.myr;
+  const cashPosition = calculateCashPosition(assets, stockHoldings);
+  const nonCashStockHoldings = excludeCashHoldings(stockHoldings);
+
+  if (cashPosition > 0) {
+    allocation['Cash'] = cashPosition;
   }
-  
-  // Add crypto portfolio (considered current/liquid)
+
+  if (nonCashStockHoldings.length > 0) {
+    const stockValue = await calculateTotalPortfolioValue(nonCashStockHoldings);
+    if (stockValue.myr > 0) {
+      allocation['Stock Portfolio'] = stockValue.myr;
+    }
+  }
+
   if (cryptoHoldings.length > 0) {
     const cryptoValue = await calculateTotalCryptoPortfolioValue(cryptoHoldings);
-    allocation['Crypto Portfolio'] = (allocation['Crypto Portfolio'] || 0) + cryptoValue.myr;
+    if (cryptoValue.myr > 0) {
+      allocation['Crypto Portfolio'] = cryptoValue.myr;
+    }
   }
-  
+
   return Object.entries(allocation)
     .map(([name, value]) => ({ name, value }))
     .sort((a, b) => b.value - a.value);
