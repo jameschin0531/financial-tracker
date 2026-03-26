@@ -8,6 +8,10 @@
   "main": "electron/main.cjs",
   "scripts": {
     "dev": "bun --bun run server.ts",
+    "test:e2e": "npx playwright test --reporter=list",
+    "test:e2e:report": "npx playwright test && npx playwright show-report",
+    "test:e2e:headed": "npx playwright test --headed",
+    "test:e2e:debug": "npx playwright test --debug",
     "build": "bun build src/index.tsx --outdir dist --target browser --minify && cp public/index.html dist/index.html",
     "preview": "bun run dist/index.html",
     "electron": "electron .",
@@ -27,6 +31,7 @@
     "recharts": "^2.10.3"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "@types/bun": "latest",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
