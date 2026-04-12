@@ -320,6 +320,9 @@ export const FinancialDataProvider: React.FC<{ children: ReactNode }> = ({ child
       saveTimeoutRef.current = null;
       saveInFlightRef.current = true;
       saveFinancialData(user.id, data)
+        .then(() => {
+          localDirtyRef.current = false;
+        })
         .catch((error) => {
           console.error('Error saving financial data:', error);
         })

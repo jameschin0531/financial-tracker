@@ -8,6 +8,7 @@ describe("shouldSkipBackgroundRefresh", () => {
         blockUi: false,
         hasPendingSaveTimeout: true,
         isSaveInFlight: false,
+        isLocalDirty: false,
       }),
     ).toBe(true);
   });
@@ -18,16 +19,29 @@ describe("shouldSkipBackgroundRefresh", () => {
         blockUi: false,
         hasPendingSaveTimeout: false,
         isSaveInFlight: true,
+        isLocalDirty: false,
       }),
     ).toBe(true);
   });
 
-  test("does not skip blocking refresh", () => {
+  test("skips non-blocking refresh when local state is dirty", () => {
+    expect(
+      shouldSkipBackgroundRefresh({
+        blockUi: false,
+        hasPendingSaveTimeout: false,
+        isSaveInFlight: false,
+        isLocalDirty: true,
+      }),
+    ).toBe(true);
+  });
+
+  test("does not skip blocking refresh even when dirty", () => {
     expect(
       shouldSkipBackgroundRefresh({
         blockUi: true,
         hasPendingSaveTimeout: true,
         isSaveInFlight: true,
+        isLocalDirty: true,
       }),
     ).toBe(false);
   });
@@ -38,6 +52,7 @@ describe("shouldSkipBackgroundRefresh", () => {
         blockUi: false,
         hasPendingSaveTimeout: false,
         isSaveInFlight: false,
+        isLocalDirty: false,
       }),
     ).toBe(false);
   });
