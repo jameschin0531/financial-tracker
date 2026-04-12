@@ -98,6 +98,7 @@ export const FinancialDataProvider: React.FC<{ children: ReactNode }> = ({ child
   const [isLoading, setIsLoading] = useState(true);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const saveInFlightRef = useRef(false);
+  const localDirtyRef = useRef(false);
   const initialRefreshRef = useRef<{ userId: string | null; inFlight: boolean }>({ userId: null, inFlight: false });
   const activeUserIdRef = useRef<string | null>(null);
   const loadingDataRef = useRef(false);
@@ -107,6 +108,7 @@ export const FinancialDataProvider: React.FC<{ children: ReactNode }> = ({ child
       blockUi,
       hasPendingSaveTimeout: saveTimeoutRef.current !== null,
       isSaveInFlight: saveInFlightRef.current,
+      isLocalDirty: localDirtyRef.current,
     })) {
       return;
     }
@@ -335,85 +337,92 @@ export const FinancialDataProvider: React.FC<{ children: ReactNode }> = ({ child
     };
   }, [data, isLoading, user]);
 
+  // Wrapper that marks local state as dirty synchronously, so background
+  // refreshes triggered before the save-effect runs are blocked by the guard.
+  const setDataDirty = (updater: React.SetStateAction<FinancialData>) => {
+    localDirtyRef.current = true;
+    setData(updater);
+  };
+
   const addAsset = (asset: Omit<Asset, 'id'>) => {
-    setData(prev => ({
+    setDataDirty(prev => ({
       ...prev,
       assets: [...prev.assets, { ...asset, id: generateId() }],
     }));
   };
 
   const updateAsset = (id: string, asset: Partial<Asset>) => {
-    setData(prev => ({
+    setDataDirty(prev => ({
       ...prev,
       assets: prev.assets.map(a => (a.id === id ? { ...a, ...asset } : a)),
     }));
   };
 
   const deleteAsset = (id: string) => {
-    setData(prev => ({
+    setDataDirty(prev => ({
       ...prev,
       assets: prev.assets.filter(a => a.id !== id),
     }));
   };
 
   const addLiability = (liability: Omit<Liability, 'id'>) => {
-    setData(prev => ({
+    setDataDirty(prev => ({
       ...prev,
       liabilities: [...prev.liabilities, { ...liability, id: generateId() }],
     }));
   };
 
   const updateLiability = (id: string, liability: Partial<Liability>) => {
-    setData(prev => ({
+    setDataDirty(prev => ({
       ...prev,
       liabilities: prev.liabilities.map(l => (l.id === id ? { ...l, ...liability } : l)),
     }));
   };
 
   const deleteLiability = (id: string) => {
-    setData(prev => ({
+    setDataDirty(prev => ({
       ...prev,
       liabilities: prev.liabilities.filter(l => l.id !== id),
     }));
   };
 
   const addIncome = (income: Omit<Income, 'id'>) => {
-    setData(prev => ({
+    setDataDirty(prev => ({
       ...prev,
       income: [...prev.income, { ...income, id: generateId() }],
     }));
   };
 
   const updateIncome = (id: string, income: Partial<Income>) => {
-    setData(prev => ({
+    setDataDirty(prev => ({
       ...prev,
       income: prev.income.map(i => (i.id === id ? { ...i, ...income } : i)),
     }));
   };
 
   const deleteIncome = (id: string) => {
-    setData(prev => ({
+    setDataDirty(prev => ({
       ...prev,
       income: prev.income.filter(i => i.id !== id),
     }));
   };
 
   const addExpense = (expense: Omit<Expense, 'id'>) => {
-    setData(prev => ({
+    setDataDirty(prev => ({
       ...prev,
       expenses: [...prev.expenses, { ...expense, id: generateId() }],
     }));
   };
 
   const updateExpense = (id: string, expense: Partial<Expense>) => {
-    setData(prev => ({
+    setDataDirty(prev => ({
       ...prev,
       expenses: prev.expenses.map(e => (e.id === id ? { ...e, ...expense } : e)),
     }));
   };
 
   const deleteExpense = (id: string) => {
-    setData(prev => ({
+    setDataDirty(prev => ({
       ...prev,
       expenses: prev.expenses.filter(e => e.id !== id),
     }));
@@ -422,7 +431,8 @@ export const FinancialDataProvider: React.FC<{ children: ReactNode }> = ({ child
   const addAssetCategory = (category: string) => {
     const trimmedCategory = category.trim();
     if (!trimmedCategory) return;
-    
+
+    localDirtyRef.current = true;
     setData(prev => {
       if (prev.assetCategories.includes(trimmedCategory)) {
         return prev;
@@ -437,7 +447,8 @@ export const FinancialDataProvider: React.FC<{ children: ReactNode }> = ({ child
   const addLiabilityCategory = (category: string) => {
     const trimmedCategory = category.trim();
     if (!trimmedCategory) return;
-    
+
+    localDirtyRef.current = true;
     setData(prev => {
       if (prev.liabilityCategories.includes(trimmedCategory)) {
         return prev;
@@ -452,7 +463,8 @@ export const FinancialDataProvider: React.FC<{ children: ReactNode }> = ({ child
   const addExpenseCategory = (category: string) => {
     const trimmedCategory = category.trim();
     if (!trimmedCategory) return;
-    
+
+    localDirtyRef.current = true;
     setData(prev => {
       if (prev.expenseCategories.includes(trimmedCategory)) {
         return prev;
@@ -466,30 +478,30 @@ export const FinancialDataProvider: React.FC<{ children: ReactNode }> = ({ child
 
   // Stock Holdings
   const addStockHolding = (holding: Omit<StockHolding, 'id'>) => {
-    setData(prev => ({
+    setDataDirty(prev => ({
       ...prev,
       stockHoldings: [...prev.stockHoldings, { ...holding, id: generateId() }],
     }));
   };
 
   const updateStockHolding = (id: string, holding: Partial<StockHolding>) => {
-    setData(prev => ({
+    setDataDirty(prev => ({
       ...prev,
       stockHoldings: prev.stockHoldings.map(h => (h.id === id ? { ...h, ...holding } : h)),
     }));
   };
 
   const deleteStockHolding = (id: string) => {
-    setData(prev => ({
+    setDataDirty(prev => ({
       ...prev,
       stockHoldings: prev.stockHoldings.filter(h => h.id !== id),
     }));
   };
 
   const updateStockPrice = (id: string, price: number) => {
-    setData(prev => ({
+    setDataDirty(prev => ({
       ...prev,
-      stockHoldings: prev.stockHoldings.map(h => 
+      stockHoldings: prev.stockHoldings.map(h =>
         h.id === id ? { ...h, marketPrice: price, lastUpdated: new Date().toISOString() } : h
       ),
     }));
@@ -501,7 +513,7 @@ export const FinancialDataProvider: React.FC<{ children: ReactNode }> = ({ child
     }
 
     const timestamp = new Date().toISOString();
-    setData(prev => ({
+    setDataDirty(prev => ({
       ...prev,
       stockHoldings: prev.stockHoldings.map(h => {
         if (h.stockType === 'Cash') {
@@ -517,30 +529,30 @@ export const FinancialDataProvider: React.FC<{ children: ReactNode }> = ({ child
 
   // Crypto Holdings
   const addCryptoHolding = (holding: Omit<CryptoHolding, 'id'>) => {
-    setData(prev => ({
+    setDataDirty(prev => ({
       ...prev,
       cryptoHoldings: [...prev.cryptoHoldings, { ...holding, id: generateId() }],
     }));
   };
 
   const updateCryptoHolding = (id: string, holding: Partial<CryptoHolding>) => {
-    setData(prev => ({
+    setDataDirty(prev => ({
       ...prev,
       cryptoHoldings: prev.cryptoHoldings.map(h => (h.id === id ? { ...h, ...holding } : h)),
     }));
   };
 
   const deleteCryptoHolding = (id: string) => {
-    setData(prev => ({
+    setDataDirty(prev => ({
       ...prev,
       cryptoHoldings: prev.cryptoHoldings.filter(h => h.id !== id),
     }));
   };
 
   const updateCryptoPrice = (id: string, price: number) => {
-    setData(prev => ({
+    setDataDirty(prev => ({
       ...prev,
-      cryptoHoldings: prev.cryptoHoldings.map(h => 
+      cryptoHoldings: prev.cryptoHoldings.map(h =>
         h.id === id ? { ...h, marketPrice: price, lastUpdated: new Date().toISOString() } : h
       ),
     }));
@@ -552,7 +564,7 @@ export const FinancialDataProvider: React.FC<{ children: ReactNode }> = ({ child
     }
 
     const timestamp = new Date().toISOString();
-    setData(prev => ({
+    setDataDirty(prev => ({
       ...prev,
       cryptoHoldings: prev.cryptoHoldings.map(h => {
         const price = prices.get(h.symbol.toUpperCase());
@@ -565,21 +577,21 @@ export const FinancialDataProvider: React.FC<{ children: ReactNode }> = ({ child
 
   // Trading Accounts
   const addTradingAccount = (account: Omit<TradingAccount, 'id'>) => {
-    setData(prev => ({
+    setDataDirty(prev => ({
       ...prev,
       tradingAccounts: [...prev.tradingAccounts, { ...account, id: generateId() }],
     }));
   };
 
   const updateTradingAccount = (id: string, account: Partial<TradingAccount>) => {
-    setData(prev => ({
+    setDataDirty(prev => ({
       ...prev,
       tradingAccounts: prev.tradingAccounts.map(a => (a.id === id ? { ...a, ...account } : a)),
     }));
   };
 
   const deleteTradingAccount = (id: string) => {
-    setData(prev => ({
+    setDataDirty(prev => ({
       ...prev,
       tradingAccounts: prev.tradingAccounts.filter(a => a.id !== id),
     }));
@@ -587,21 +599,21 @@ export const FinancialDataProvider: React.FC<{ children: ReactNode }> = ({ child
 
   // Crypto Accounts
   const addCryptoAccount = (account: Omit<CryptoAccount, 'id'>) => {
-    setData(prev => ({
+    setDataDirty(prev => ({
       ...prev,
       cryptoAccounts: [...prev.cryptoAccounts, { ...account, id: generateId() }],
     }));
   };
 
   const updateCryptoAccount = (id: string, account: Partial<CryptoAccount>) => {
-    setData(prev => ({
+    setDataDirty(prev => ({
       ...prev,
       cryptoAccounts: prev.cryptoAccounts.map(a => (a.id === id ? { ...a, ...account } : a)),
     }));
   };
 
   const deleteCryptoAccount = (id: string) => {
-    setData(prev => ({
+    setDataDirty(prev => ({
       ...prev,
       cryptoAccounts: prev.cryptoAccounts.filter(a => a.id !== id),
     }));
@@ -609,21 +621,21 @@ export const FinancialDataProvider: React.FC<{ children: ReactNode }> = ({ child
 
   // Deposits
   const addDeposit = (deposit: Omit<Deposit, 'id'>) => {
-    setData(prev => ({
+    setDataDirty(prev => ({
       ...prev,
       deposits: [...prev.deposits, { ...deposit, id: generateId() }],
     }));
   };
 
   const updateDeposit = (id: string, deposit: Partial<Deposit>) => {
-    setData(prev => ({
+    setDataDirty(prev => ({
       ...prev,
       deposits: prev.deposits.map(d => (d.id === id ? { ...d, ...deposit } : d)),
     }));
   };
 
   const deleteDeposit = (id: string) => {
-    setData(prev => ({
+    setDataDirty(prev => ({
       ...prev,
       deposits: prev.deposits.filter(d => d.id !== id),
     }));
