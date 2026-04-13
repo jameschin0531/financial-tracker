@@ -145,7 +145,7 @@ const AssetsPage: React.FC = () => {
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="space-y-6">
         <Card>
           <CardHeader>
             <CardTitle>
@@ -176,20 +176,22 @@ const AssetsPage: React.FC = () => {
             ) : (
               <div className="space-y-3">
                 {data.assets.map((asset) => (
-                  <div key={asset.id} className="flex items-center justify-between rounded-lg border p-3">
-                    <div className="space-y-1">
-                      <h3 className="font-medium leading-none">{asset.name}</h3>
-                      <p className="text-sm text-muted-foreground">
-                        {asset.category} | {asset.assetType === 'current' ? 'Current' : 'Fixed'} | {asset.currency}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {new Date(asset.date).toLocaleDateString()}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold">
+                  <div key={asset.id} className="rounded-lg border p-3 space-y-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="space-y-1 min-w-0">
+                        <h3 className="font-medium leading-none truncate">{asset.name}</h3>
+                        <p className="text-sm text-muted-foreground">
+                          {asset.category} | {asset.assetType === 'current' ? 'Current' : 'Fixed'} | {asset.currency}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {new Date(asset.date).toLocaleDateString()}
+                        </p>
+                      </div>
+                      <span className="font-semibold text-right shrink-0">
                         {formatCurrencyWithRate(asset.value, asset.currency, asset.exchangeRate)}
                       </span>
+                    </div>
+                    <div className="flex gap-2 justify-end">
                       <Button
                         variant="outline"
                         size="sm"

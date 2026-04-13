@@ -288,11 +288,11 @@ const StockTrackerPage: React.FC = () => {
         ) : editingHolding === null ? (
           <>
             {/* Filters */}
-            <div className="flex flex-wrap items-end gap-3">
+            <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-end gap-3">
               <div className="space-y-1">
                 <Label className="text-xs">Account</Label>
                 <Select value={filterAccount} onValueChange={setFilterAccount}>
-                  <SelectTrigger className="w-[140px]">
+                  <SelectTrigger className="w-full sm:w-[140px]">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -307,7 +307,7 @@ const StockTrackerPage: React.FC = () => {
               <div className="space-y-1">
                 <Label className="text-xs">P&L</Label>
                 <Select value={filterPandL} onValueChange={setFilterPandL}>
-                  <SelectTrigger className="w-[120px]">
+                  <SelectTrigger className="w-full sm:w-[120px]">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -348,7 +348,7 @@ const StockTrackerPage: React.FC = () => {
               <div className="space-y-1">
                 <Label className="text-xs">Sort By</Label>
                 <Select value={sortBy} onValueChange={(v) => setSortBy(v as typeof sortBy)}>
-                  <SelectTrigger className="w-[180px]">
+                  <SelectTrigger className="w-full sm:w-[180px]">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>

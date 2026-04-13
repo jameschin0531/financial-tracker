@@ -34,7 +34,7 @@ const LiabilitiesPage: React.FC = () => {
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="space-y-6">
         <Card>
           <CardHeader>
             <CardTitle>
@@ -65,25 +65,27 @@ const LiabilitiesPage: React.FC = () => {
             ) : (
               <div className="space-y-3">
                 {data.liabilities.map((liability) => (
-                  <div key={liability.id} className="flex items-center justify-between rounded-lg border p-3">
-                    <div className="space-y-1">
-                      <h3 className="font-medium leading-none">{liability.name}</h3>
-                      <p className="text-sm text-muted-foreground">
-                        {liability.category} | {liability.currency}
-                      </p>
-                      {liability.interestRate && (
+                  <div key={liability.id} className="rounded-lg border p-3 space-y-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="space-y-1 min-w-0">
+                        <h3 className="font-medium leading-none truncate">{liability.name}</h3>
                         <p className="text-sm text-muted-foreground">
-                          Interest Rate: {liability.interestRate}%
+                          {liability.category} | {liability.currency}
                         </p>
-                      )}
-                      <p className="text-xs text-muted-foreground">
-                        {new Date(liability.date).toLocaleDateString()}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold">
+                        {liability.interestRate && (
+                          <p className="text-sm text-muted-foreground">
+                            Interest Rate: {liability.interestRate}%
+                          </p>
+                        )}
+                        <p className="text-xs text-muted-foreground">
+                          {new Date(liability.date).toLocaleDateString()}
+                        </p>
+                      </div>
+                      <span className="font-semibold text-right shrink-0">
                         {formatCurrencyWithRate(liability.amount, liability.currency, liability.exchangeRate)}
                       </span>
+                    </div>
+                    <div className="flex gap-2 justify-end">
                       <Button
                         variant="outline"
                         size="sm"
