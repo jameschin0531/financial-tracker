@@ -236,6 +236,7 @@
 @layer base {
   * {
     @apply border-border;
+    min-width: 0;
   }
 
   body {
@@ -243,10 +244,6 @@
     margin: 0;
     padding: 0;
     letter-spacing: var(--tracking-normal);
-  }
-
-  html {
-    overflow-x: clip;
   }
 
   html, body, #root {
