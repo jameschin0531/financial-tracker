@@ -253,18 +253,6 @@
     min-height: 100vh;
   }
 
-  body::after {
-    content: '';
-    position: fixed;
-    inset: 0;
-    background-image:
-      linear-gradient(rgba(148, 163, 184, 0.05) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(148, 163, 184, 0.05) 1px, transparent 1px);
-    background-size: 28px 28px;
-    mask-image: radial-gradient(circle at center, black 30%, transparent 100%);
-    pointer-events: none;
-    z-index: -1;
-  }
 
   ::selection {
     background: rgba(124, 58, 237, 0.3);
