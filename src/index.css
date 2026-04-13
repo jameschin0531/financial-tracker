@@ -242,14 +242,15 @@
     @apply bg-background text-foreground font-sans antialiased;
     margin: 0;
     padding: 0;
-    overflow-x: hidden;
     letter-spacing: var(--tracking-normal);
+  }
+
+  html {
+    overflow-x: clip;
   }
 
   html, body, #root {
     min-height: 100vh;
-    overflow-x: hidden;
-    max-width: 100vw;
   }
 
   body::after {

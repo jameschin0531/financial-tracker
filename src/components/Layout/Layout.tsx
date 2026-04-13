@@ -12,7 +12,7 @@ const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageChange, am
   return (
     <div className="min-h-screen flex flex-col" data-amount-visibility={amountVisibility}>
       <Header currentPage={currentPage} onPageChange={onPageChange} />
-      <main className="flex-1 px-3 py-4 sm:px-4 md:px-6 lg:px-8 overflow-x-hidden">
+      <main className="flex-1 px-3 py-4 sm:px-4 md:px-6 lg:px-8">
         {children}
       </main>
     </div>
