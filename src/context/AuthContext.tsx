@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { User, Session, AuthError } from '@supabase/supabase-js';
+import type { User, Session, AuthError } from '@supabase/supabase-js';
 import { initializeSupabase, getSupabase, isSupabaseInitialized } from '../services/supabaseClient';
 
 interface AppConfig {
@@ -28,25 +28,28 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     // Fetch config and initialize Supabase
     const initializeAuth = async () => {
       try {
-        // Fetch config from API
-        const response = await fetch('/api/config');
-        if (!response.ok) {
-          throw new Error('Failed to fetch config');
-        }
-        
-        const configData = await response.json();
-        
-        if (!configData.supabaseUrl || !configData.supabaseAnonKey) {
-          throw new Error('Missing Supabase credentials in config');
+        // Try Vite env vars first, fall back to API endpoint
+        let supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+        let supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+
+        if (!supabaseUrl || !supabaseAnonKey) {
+          const response = await fetch('/api/config');
+          if (!response.ok) {
+            throw new Error('Failed to fetch config');
+          }
+          const configData = await response.json();
+          supabaseUrl = configData.supabaseUrl;
+          supabaseAnonKey = configData.supabaseAnonKey;
         }
 
-        setConfig({
-          supabaseUrl: configData.supabaseUrl,
-          supabaseAnonKey: configData.supabaseAnonKey,
-        });
+        if (!supabaseUrl || !supabaseAnonKey) {
+          throw new Error('Missing Supabase credentials');
+        }
+
+        setConfig({ supabaseUrl, supabaseAnonKey });
 
         // Initialize Supabase client
-        const supabase = initializeSupabase(configData.supabaseUrl, configData.supabaseAnonKey);
+        const supabase = initializeSupabase(supabaseUrl, supabaseAnonKey);
 
         // Get initial session
         const { data: { session: initialSession } } = await supabase.auth.getSession();

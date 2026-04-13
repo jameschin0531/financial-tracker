@@ -1,4 +1,4 @@
-import { FinancialData } from '../../types/financial';
+import type { FinancialData } from '../../types/financial';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';

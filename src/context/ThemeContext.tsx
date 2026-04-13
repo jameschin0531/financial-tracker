@@ -21,6 +21,7 @@ export const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   });
 
   useEffect(() => {
+    document.documentElement.classList.toggle('dark', theme === 'dark');
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem(THEME_STORAGE_KEY, theme);
   }, [theme]);

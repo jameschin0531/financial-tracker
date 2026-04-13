@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import styles from './AuthPage.module.css';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 
 const AuthPage: React.FC = () => {
   const { signInWithOAuth } = useAuth();
@@ -20,26 +21,28 @@ const AuthPage: React.FC = () => {
   };
 
   return (
-    <div className={styles.authPage}>
-      <div className={styles.authCard}>
-        <div className={styles.authHeader}>
-          <h1 className={styles.authTitle}>Financial Tracker</h1>
-          <p className={styles.authSubtitle}>
+    <div className="flex min-h-screen items-center justify-center bg-background p-4">
+      <Card className="w-full max-w-md">
+        <CardHeader>
+          <CardTitle>Financial Tracker</CardTitle>
+          <CardDescription>
             Sign in to securely access your financial data
-          </p>
-        </div>
+          </CardDescription>
+        </CardHeader>
 
-        <div className={styles.authButtons}>
-          <button
-            className={`${styles.authButton} ${styles.googleButton}`}
+        <CardContent>
+          <Button
+            className="w-full"
+            variant="outline"
+            size="lg"
             onClick={handleOAuthSignIn}
             disabled={loading}
           >
             {loading ? (
-              <span className={styles.spinner}></span>
+              <span className="size-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
             ) : (
               <>
-                <svg className={styles.providerIcon} viewBox="0 0 24 24">
+                <svg className="size-5" viewBox="0 0 24 24">
                   <path
                     fill="currentColor"
                     d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -60,24 +63,23 @@ const AuthPage: React.FC = () => {
                 Continue with Google
               </>
             )}
-          </button>
-        </div>
+          </Button>
 
-        {error && (
-          <div className={styles.errorMessage}>
-            {error}
-          </div>
-        )}
+          {error && (
+            <div className="mt-4 rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+              {error}
+            </div>
+          )}
+        </CardContent>
 
-        <div className={styles.authFooter}>
-          <p className={styles.footerText}>
+        <CardFooter>
+          <p className="text-center text-xs text-muted-foreground">
             Your data is encrypted and stored securely. We never share your information.
           </p>
-        </div>
-      </div>
+        </CardFooter>
+      </Card>
     </div>
   );
 };
 
 export default AuthPage;
-

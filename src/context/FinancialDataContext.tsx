@@ -644,18 +644,20 @@ export const FinancialDataProvider: React.FC<{ children: ReactNode }> = ({ child
     }));
   };
 
-  // Show loading state while data is being loaded
+  // Show skeleton loading state while data is being loaded
   if (isLoading) {
     return (
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'center', 
-        alignItems: 'center', 
-        height: '100vh',
-        color: 'var(--text-primary)',
-        background: 'var(--bg-primary)'
-      }}>
-        Loading...
+      <div className="space-y-6 p-4 md:p-6 lg:p-8">
+        <div className="h-8 w-48 rounded-md bg-muted animate-pulse" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="h-28 rounded-lg bg-muted animate-pulse" />
+          ))}
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="h-64 rounded-lg bg-muted animate-pulse" />
+          <div className="h-64 rounded-lg bg-muted animate-pulse" />
+        </div>
       </div>
     );
   }

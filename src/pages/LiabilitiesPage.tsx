@@ -1,12 +1,13 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useFinancialData } from '../context/FinancialDataContext';
 import { useToast } from '../context/ToastContext';
-import { Liability } from '../types/financial';
+import type { Liability } from '../types/financial';
 import LiabilityForm from '../components/Forms/LiabilityForm';
 import ConfirmModal from '../components/Layout/ConfirmModal';
 import { calculateTotalLiabilities } from '../services/calculations';
 import { formatCurrency, formatCurrencyWithRate } from '../utils/formatters';
-import styles from './Pages.module.css';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 
 const LiabilitiesPage: React.FC = () => {
   const { data, deleteLiability } = useFinancialData();
@@ -24,86 +25,86 @@ const LiabilitiesPage: React.FC = () => {
   };
 
   return (
-    <div className={styles.page}>
-      <div className={styles.pageHeader}>
-        <h1 className={styles.pageTitle}>Liabilities</h1>
-        <div className={styles.pageSummary}>
-          <span className={styles.summaryLabel}>Total Liabilities:</span>
-          <span className={styles.summaryValue}>{formatCurrency(totalLiabilities)}</span>
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <h1 className="text-2xl font-bold tracking-tight">Liabilities</h1>
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-muted-foreground">Total Liabilities:</span>
+          <span className="text-lg font-semibold">{formatCurrency(totalLiabilities)}</span>
         </div>
       </div>
 
-      <div className={styles.pageContent}>
-        <div className={styles.contentGrid}>
-          <div className={styles.formSection}>
-            <h2 className={styles.sectionTitle}>
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>
               {editingLiability ? 'Edit Liability' : 'Add New Liability'}
-            </h2>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
             <LiabilityForm
               editingLiability={editingLiability}
               onCancel={() => setEditingLiability(undefined)}
             />
-          </div>
+          </CardContent>
+        </Card>
 
-          <div className={styles.listSection}>
-            <h2 className={styles.sectionTitle}>Your Liabilities ({data.liabilities.length})</h2>
+        <Card>
+          <CardHeader>
+            <CardTitle>Your Liabilities ({data.liabilities.length})</CardTitle>
+          </CardHeader>
+          <CardContent>
             {data.liabilities.length === 0 ? (
-              <div className={styles.emptyState}>
-                <div className={styles.emptyStateIcon}>
-                  <svg viewBox="0 0 24 24" width="48" height="48" aria-hidden="true">
-                    <path d="M3 7.5A2.5 2.5 0 015.5 5h13A2.5 2.5 0 0121 7.5v9a2.5 2.5 0 01-2.5 2.5h-13A2.5 2.5 0 013 16.5v-9zm2 2v5h14v-5H5zm9 1.5a1 1 0 100 2h3a1 1 0 100-2h-3z" fill="currentColor" opacity="0.3" />
-                  </svg>
-                </div>
-                <p className={styles.emptyStateTitle}>No liabilities yet</p>
-                <p className={styles.emptyStateText}>Add your first liability using the form to track what you owe.</p>
+              <div className="flex flex-col items-center justify-center py-8 text-center text-muted-foreground">
+                <svg viewBox="0 0 24 24" width="48" height="48" aria-hidden="true" className="mb-4 opacity-30">
+                  <path d="M3 7.5A2.5 2.5 0 015.5 5h13A2.5 2.5 0 0121 7.5v9a2.5 2.5 0 01-2.5 2.5h-13A2.5 2.5 0 013 16.5v-9zm2 2v5h14v-5H5zm9 1.5a1 1 0 100 2h3a1 1 0 100-2h-3z" fill="currentColor" opacity="0.3" />
+                </svg>
+                <p className="font-medium">No liabilities yet</p>
+                <p className="text-sm">Add your first liability using the form to track what you owe.</p>
               </div>
             ) : (
-              <div className={styles.list}>
+              <div className="space-y-3">
                 {data.liabilities.map((liability) => (
-                  <div key={liability.id} className={styles.listItem}>
-                    <div className={styles.listItemContent}>
-                      <h3 className={styles.listItemTitle}>{liability.name}</h3>
-                      <p className={styles.listItemSubtitle}>
+                  <div key={liability.id} className="flex items-center justify-between rounded-lg border p-3">
+                    <div className="space-y-1">
+                      <h3 className="font-medium leading-none">{liability.name}</h3>
+                      <p className="text-sm text-muted-foreground">
                         {liability.category} | {liability.currency}
                       </p>
                       {liability.interestRate && (
-                        <p className={styles.listItemSubtitle}>
+                        <p className="text-sm text-muted-foreground">
                           Interest Rate: {liability.interestRate}%
                         </p>
                       )}
-                      <p className={styles.listItemDate}>
+                      <p className="text-xs text-muted-foreground">
                         {new Date(liability.date).toLocaleDateString()}
                       </p>
                     </div>
-                    <div className={styles.listItemActions}>
-                      <div className={styles.valueContainer}>
-                        <span className={styles.listItemValue}>
-                          {formatCurrencyWithRate(liability.amount, liability.currency, liability.exchangeRate)}
-                        </span>
-                      </div>
-                      <button
-                        className={styles.editButton}
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold">
+                        {formatCurrencyWithRate(liability.amount, liability.currency, liability.exchangeRate)}
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
                         onClick={() => setEditingLiability(liability)}
-                        aria-label="Edit liability"
-                        title="Edit liability"
                       >
                         Edit
-                      </button>
-                      <button
-                        className={styles.deleteButton}
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        size="sm"
                         onClick={() => setDeleteTarget(liability)}
-                        aria-label="Delete liability"
-                        title="Delete liability"
                       >
                         Delete
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 ))}
               </div>
             )}
-          </div>
-        </div>
+          </CardContent>
+        </Card>
       </div>
 
       {deleteTarget && (

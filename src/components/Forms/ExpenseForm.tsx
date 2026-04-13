@@ -1,9 +1,25 @@
 import React, { useState, useEffect } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { useFinancialData } from '../../context/FinancialDataContext';
 import type { Expense, Currency } from '../../types/financial';
 import { getUSDToMYRRate } from '../../services/exchangeRateService';
-import styles from './Forms.module.css';
 import { preventNumberInputScroll } from './IncomeForm';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Form, FormField, FormItem, FormLabel, FormControl, FormDescription, FormMessage } from '@/components/ui/form';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
+const expenseFormSchema = z.object({
+  category: z.string().min(1, 'Category is required'),
+  currency: z.enum(['MYR', 'USD']),
+  amount: z.string().min(1, 'Amount is required').refine(v => !isNaN(parseFloat(v)) && parseFloat(v) > 0, 'Amount must be greater than 0'),
+  date: z.string().min(1, 'Date is required'),
+  description: z.string().optional().or(z.literal('')),
+});
+
+type ExpenseFormValues = z.infer<typeof expenseFormSchema>;
 
 interface ExpenseFormProps {
   editingExpense?: Expense;
@@ -12,113 +28,84 @@ interface ExpenseFormProps {
 
 const ExpenseForm: React.FC<ExpenseFormProps> = ({ editingExpense, onCancel }) => {
   const { data, addExpense, updateExpense, addExpenseCategory } = useFinancialData();
-  const [category, setCategory] = useState(editingExpense?.category || data.expenseCategories[0] || '');
-  const [newCategory, setNewCategory] = useState('');
   const [showNewCategory, setShowNewCategory] = useState(false);
-  const [currency, setCurrency] = useState<Currency>(editingExpense?.currency || 'MYR');
+  const [newCategory, setNewCategory] = useState('');
   const [exchangeRate, setExchangeRate] = useState<number | undefined>(editingExpense?.exchangeRate);
   const [loadingRate, setLoadingRate] = useState(false);
-  const [amount, setAmount] = useState(editingExpense?.amount.toString() || '');
-  const getInitialDate = (): string => {
-    if (editingExpense) {
-      return editingExpense.date;
-    }
-    return new Date().toISOString().split('T')[0];
-  };
-  const [date, setDate] = useState<string>(getInitialDate());
-  const [description, setDescription] = useState(editingExpense?.description || '');
-  const [errors, setErrors] = useState<Record<string, string>>({});
 
-  // Update form fields when editingExpense changes
+  const form = useForm<ExpenseFormValues>({
+    resolver: zodResolver(expenseFormSchema),
+    defaultValues: {
+      category: editingExpense?.category || data.expenseCategories[0] || '',
+      currency: (editingExpense?.currency ?? 'MYR') as 'MYR' | 'USD',
+      amount: editingExpense?.amount.toString() || '',
+      date: editingExpense?.date || new Date().toISOString().split('T')[0],
+      description: editingExpense?.description || '',
+    },
+  });
+
+  const watchedCurrency = form.watch('currency');
+
   useEffect(() => {
     if (editingExpense) {
-      setCategory(editingExpense.category || data.expenseCategories[0] || '');
-      setCurrency(editingExpense.currency || 'MYR');
+      form.reset({
+        category: editingExpense.category || data.expenseCategories[0] || '',
+        currency: (editingExpense.currency ?? 'MYR') as 'MYR' | 'USD',
+        amount: editingExpense.amount.toString() || '',
+        date: editingExpense.date || new Date().toISOString().split('T')[0],
+        description: editingExpense.description || '',
+      });
       setExchangeRate(editingExpense.exchangeRate);
-      setAmount(editingExpense.amount.toString() || '');
-      setDate(editingExpense.date || new Date().toISOString().split('T')[0]);
-      setDescription(editingExpense.description || '');
       setShowNewCategory(false);
       setNewCategory('');
     } else {
-      // Reset form when not editing
-      setCategory(data.expenseCategories[0] || '');
-      setCurrency('MYR');
+      form.reset({
+        category: data.expenseCategories[0] || '',
+        currency: 'MYR',
+        amount: '',
+        date: new Date().toISOString().split('T')[0],
+        description: '',
+      });
       setExchangeRate(undefined);
-      setAmount('');
-      setDate(new Date().toISOString().split('T')[0]);
-      setDescription('');
       setShowNewCategory(false);
       setNewCategory('');
     }
-    setErrors({});
-  }, [editingExpense, data.expenseCategories]);
+  }, [editingExpense, data.expenseCategories, form]);
 
-  // Fetch exchange rate when USD is selected
   useEffect(() => {
-    if (currency === 'USD' && !exchangeRate) {
+    if (watchedCurrency === 'USD' && !exchangeRate) {
       setLoadingRate(true);
       getUSDToMYRRate()
         .then(rate => {
           setExchangeRate(rate);
           setLoadingRate(false);
         })
-        .catch(error => {
-          console.error('Failed to fetch exchange rate:', error);
+        .catch(() => {
           setLoadingRate(false);
         });
-    } else if (currency === 'MYR') {
+    } else if (watchedCurrency === 'MYR') {
       setExchangeRate(undefined);
     }
-  }, [currency]);
+  }, [watchedCurrency]);
 
-  const validate = (): boolean => {
-    const newErrors: Record<string, string> = {};
-    
-    // Validate category based on whether we're adding a new one
-    if (showNewCategory) {
-      if (!newCategory || !newCategory.trim()) {
-        newErrors.category = 'New category name is required';
-      }
-    } else {
-      if (!category || category === '__new__' || !category.trim()) {
-        newErrors.category = 'Category is required';
-      }
-    }
-    
-    if (!amount || parseFloat(amount) <= 0) {
-      newErrors.amount = 'Amount must be greater than 0';
-    }
-    
-    if (!date) {
-      newErrors.date = 'Date is required';
-    }
-    
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!validate()) {
+  const onSubmit = (values: ExpenseFormValues) => {
+    if (showNewCategory && !newCategory.trim()) {
       return;
     }
-    
-    // Handle new category
-    let finalCategory = category;
+
+    let finalCategory = values.category;
     if (showNewCategory && newCategory.trim()) {
       addExpenseCategory(newCategory.trim());
       finalCategory = newCategory.trim();
     }
-    
+
     const expenseData: Omit<Expense, 'id'> = {
       category: finalCategory || data.expenseCategories[0] || '',
-      amount: parseFloat(amount),
-      currency,
-      exchangeRate: currency === 'USD' ? exchangeRate : undefined,
-      date: date || new Date().toISOString().split('T')[0],
-      description: description.trim() || undefined,
+      amount: parseFloat(values.amount),
+      currency: values.currency,
+      exchangeRate: values.currency === 'USD' ? exchangeRate : undefined,
+      date: values.date,
+      description: values.description?.trim() || undefined,
     };
 
     if (editingExpense) {
@@ -126,179 +113,167 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ editingExpense, onCancel }) =
       onCancel?.();
     } else {
       addExpense(expenseData);
-      setAmount('');
-      setDescription('');
-      setDate(new Date().toISOString().split('T')[0]);
+      form.reset({
+        category: data.expenseCategories[0] || '',
+        currency: 'MYR',
+        amount: '',
+        date: new Date().toISOString().split('T')[0],
+        description: '',
+      });
+      setShowNewCategory(false);
+      setNewCategory('');
     }
-    setErrors({});
+  };
+
+  const handleCategorySelectChange = (value: string) => {
+    if (value === '__new__') {
+      setShowNewCategory(true);
+      form.setValue('category', '');
+      setNewCategory('');
+    } else {
+      setShowNewCategory(false);
+      form.setValue('category', value);
+      setNewCategory('');
+    }
   };
 
   return (
-    <div className={styles.formCard}>
-      <h3 className={styles.formTitle}>{editingExpense ? 'Edit Expense' : 'Add Expense'}</h3>
-      <form onSubmit={handleSubmit} className={styles.form}>
-        <div className={styles.formGroup}>
-          <label htmlFor="expense-category" className={styles.label}>
-            Category
-            <span className={styles.tooltip} title="Select the category that best describes your expense">
-              i
-            </span>
-          </label>
-          {!showNewCategory ? (
-            <select
-              id="expense-category"
-              value={category}
-              onChange={(e) => {
-                if (e.target.value === '__new__') {
-                  setShowNewCategory(true);
-                  setCategory('');
-                } else {
-                  setCategory(e.target.value);
-                }
-              }}
-              className={styles.select}
-            >
-              {data.expenseCategories.map(cat => (
-                <option key={cat} value={cat}>{cat}</option>
-              ))}
-              <option value="__new__">+ Add New Category</option>
-            </select>
-          ) : (
-            <div className={styles.newCategoryGroup}>
-              <input
-                type="text"
-                value={newCategory}
-                onChange={(e) => {
-                  setNewCategory(e.target.value);
-                  // Clear error when user starts typing
-                  if (errors.category) {
-                    setErrors(prev => {
-                      const newErrors = { ...prev };
-                      delete newErrors.category;
-                      return newErrors;
-                    });
-                  }
-                }}
-                placeholder="Enter new category name"
-                className={styles.input}
-                autoFocus
-              />
-              <button
-                type="button"
-                onClick={() => {
-                  setShowNewCategory(false);
-                  setNewCategory('');
-                  setCategory(data.expenseCategories[0] || '');
-                }}
-                className={styles.cancelButton}
-              >
-                Cancel
-              </button>
-            </div>
-          )}
-          {errors.category && <span className={styles.error}>{errors.category}</span>}
-        </div>
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <FormField control={form.control} name="category" render={({ field }) => (
+              <FormItem>
+                <FormLabel title="Select the category that best describes your expense">
+                  Category
+                </FormLabel>
+                {!showNewCategory ? (
+                  <Select value={field.value} onValueChange={handleCategorySelectChange}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select category" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {data.expenseCategories.map(cat => (
+                        <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                      ))}
+                      <SelectItem value="__new__">+ Add New Category</SelectItem>
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <FormControl>
+                    <div className="flex gap-2">
+                      <Input
+                        type="text"
+                        value={newCategory}
+                        onChange={(e) => setNewCategory(e.target.value)}
+                        placeholder="Enter new category name"
+                        autoFocus
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          setShowNewCategory(false);
+                          setNewCategory('');
+                          form.setValue('category', data.expenseCategories[0] || '');
+                        }}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </FormControl>
+                )}
+                <FormMessage />
+              </FormItem>
+            )} />
 
-        <div className={styles.formGroup}>
-          <label htmlFor="expense-currency" className={styles.label}>
-            Currency
-            <span className={styles.tooltip} title="Select the currency for this expense">
-              i
-            </span>
-          </label>
-          <select
-            id="expense-currency"
-            value={currency}
-            onChange={(e) => setCurrency(e.target.value as Currency)}
-            className={styles.select}
-          >
-            <option value="MYR">MYR (Malaysian Ringgit)</option>
-            <option value="USD">USD (US Dollar)</option>
-          </select>
-          {currency === 'USD' && (
-            <div className={styles.exchangeRateInfo}>
-              {loadingRate ? (
-                <span className={styles.loadingText}>Loading exchange rate...</span>
-              ) : exchangeRate ? (
-                <span className={styles.rateText}>
-                  Rate: 1 USD = {exchangeRate.toFixed(4)} MYR
-                </span>
-              ) : (
-                <span className={styles.errorText}>Failed to load exchange rate</span>
+            <FormField control={form.control} name="currency" render={({ field }) => (
+              <FormItem>
+                <FormLabel title="Select the currency for this expense">
+                  Currency
+                </FormLabel>
+                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select currency" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="MYR">MYR (Malaysian Ringgit)</SelectItem>
+                    <SelectItem value="USD">USD (US Dollar)</SelectItem>
+                  </SelectContent>
+                </Select>
+                {watchedCurrency === 'USD' && (
+                  <FormDescription>
+                    {loadingRate ? (
+                      <span>Loading exchange rate...</span>
+                    ) : exchangeRate ? (
+                      <span>Rate: 1 USD = {exchangeRate.toFixed(4)} MYR</span>
+                    ) : (
+                      <span className="text-destructive">Failed to load exchange rate</span>
+                    )}
+                  </FormDescription>
+                )}
+                <FormMessage />
+              </FormItem>
+            )} />
+
+            <FormField control={form.control} name="amount" render={({ field }) => (
+              <FormItem>
+                <FormLabel title="Enter the amount spent">
+                  Amount ({watchedCurrency === 'MYR' ? 'MYR' : 'USD'})
+                </FormLabel>
+                <FormControl>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="0.00"
+                    onWheel={preventNumberInputScroll}
+                    {...field}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+
+            <FormField control={form.control} name="date" render={({ field }) => (
+              <FormItem>
+                <FormLabel title="Select the date when this expense occurred">
+                  Date
+                </FormLabel>
+                <FormControl>
+                  <Input type="date" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+
+            <FormField control={form.control} name="description" render={({ field }) => (
+              <FormItem>
+                <FormLabel title="Optional: Add a description or note about this expense">
+                  Description
+                </FormLabel>
+                <FormControl>
+                  <Input placeholder="Optional" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+
+            <div className="flex gap-3 pt-2">
+              <Button type="submit">
+                {editingExpense ? 'Update Expense' : 'Add Expense'}
+              </Button>
+              {editingExpense && onCancel && (
+                <Button type="button" variant="outline" onClick={onCancel}>
+                  Cancel
+                </Button>
               )}
             </div>
-          )}
-        </div>
-
-        <div className={styles.formGroup}>
-          <label htmlFor="expense-amount" className={styles.label}>
-            Amount ({currency === 'MYR' ? 'MYR' : 'USD'})
-            <span className={styles.tooltip} title="Enter the amount spent">
-              i
-            </span>
-          </label>
-          <input
-            id="expense-amount"
-            type="number"
-            step="0.01"
-            min="0"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            onWheel={preventNumberInputScroll}
-            className={styles.input}
-            placeholder="0.00"
-          />
-          {errors.amount && <span className={styles.error}>{errors.amount}</span>}
-        </div>
-
-        <div className={styles.formGroup}>
-          <label htmlFor="expense-date" className={styles.label}>
-            Date
-            <span className={styles.tooltip} title="Select the date when this expense occurred">
-              i
-            </span>
-          </label>
-          <input
-            id="expense-date"
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            className={styles.input}
-          />
-          {errors.date && <span className={styles.error}>{errors.date}</span>}
-        </div>
-
-        <div className={styles.formGroup}>
-          <label htmlFor="expense-description" className={styles.label}>
-            Description
-            <span className={styles.tooltip} title="Optional: Add a description or note about this expense">
-              i
-            </span>
-          </label>
-          <input
-            id="expense-description"
-            type="text"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            className={styles.input}
-            placeholder="Optional"
-          />
-        </div>
-
-        <div className={styles.formActions}>
-          <button type="submit" className={styles.submitButton}>
-            {editingExpense ? 'Update Expense' : 'Add Expense'}
-          </button>
-          {editingExpense && onCancel && (
-            <button type="button" onClick={onCancel} className={styles.cancelButton}>
-              Cancel
-            </button>
-          )}
-        </div>
       </form>
-    </div>
+    </Form>
   );
 };
 
 export default ExpenseForm;
-

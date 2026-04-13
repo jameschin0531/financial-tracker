@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useFinancialData } from '../context/FinancialDataContext';
 import type { CryptoHolding, CryptoAccount } from '../types/financial';
 import { getCryptoPrices } from '../services/cryptoPriceService';
@@ -11,11 +11,21 @@ import {
 import { formatCurrency } from '../utils/formatters';
 import CryptoHoldingForm from '../components/Crypto/CryptoHoldingForm';
 import CryptoAccountForm from '../components/Crypto/CryptoAccountForm';
-import styles from './StockTracker.module.css';
+import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+} from '@/components/ui/table';
+import { cn } from '@/lib/utils';
 
 const CryptoTrackerPage: React.FC = () => {
-  const { 
-    data, 
+  const {
+    data,
     updateCryptoPrices,
     deleteCryptoHolding,
     deleteCryptoAccount,
@@ -26,7 +36,6 @@ const CryptoTrackerPage: React.FC = () => {
   const [portfolioValue, setPortfolioValue] = useState<{ usd: number; myr: number }>({ usd: 0, myr: 0 });
   const [accountSummary, setAccountSummary] = useState<Array<CryptoAccount & { pnlMYR: number; pnlPercentage: number }>>([]);
 
-  // Calculate portfolio values
   useEffect(() => {
     const calculateValues = async () => {
       const total = await calculateTotalCryptoPortfolioValue(data.cryptoHoldings);
@@ -34,7 +43,7 @@ const CryptoTrackerPage: React.FC = () => {
       setPortfolioValue(total);
       setAccountSummary(summary);
     };
-    
+
     calculateValues();
   }, [data.cryptoHoldings, data.cryptoAccounts]);
 
@@ -43,8 +52,7 @@ const CryptoTrackerPage: React.FC = () => {
     try {
       const symbols = [...new Set(data.cryptoHoldings.map(h => h.symbol))];
       const prices = await getCryptoPrices(symbols);
-      
-      // Update prices for all holdings
+
       updateCryptoPrices(prices);
     } catch (error) {
       console.error('Error updating prices:', error);
@@ -55,196 +63,185 @@ const CryptoTrackerPage: React.FC = () => {
   };
 
   return (
-    <div className={styles.page}>
-      <div className={styles.pageHeader}>
-        <div className={styles.headerTop}>
-          <h1 className={styles.pageTitle}>Crypto Tracker</h1>
-          <button
-            className={styles.updateButton}
+    <div className="space-y-6">
+      <div className="space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <h1 className="text-2xl font-bold tracking-tight">Crypto Tracker</h1>
+          <Button
             onClick={handleUpdatePrices}
             disabled={loadingPrices || data.cryptoHoldings.length === 0}
           >
             {loadingPrices ? 'Updating...' : 'Update Prices'}
-          </button>
+          </Button>
         </div>
-        <div className={styles.portfolioSummary}>
-          <div className={styles.summaryCard}>
-            <span className={styles.summaryLabel}>Total Portfolio Value</span>
-            <span className={styles.summaryValue}>{formatCurrency(portfolioValue.myr, 'MYR')}</span>
-            <span className={styles.summarySubtext}>{formatCurrency(portfolioValue.usd, 'USD')}</span>
-          </div>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          <Card>
+            <CardContent>
+              <p className="text-sm text-muted-foreground">Total Portfolio Value</p>
+              <p className="text-lg font-semibold">{formatCurrency(portfolioValue.myr, 'MYR')}</p>
+              <p className="text-xs text-muted-foreground">{formatCurrency(portfolioValue.usd, 'USD')}</p>
+            </CardContent>
+          </Card>
         </div>
       </div>
 
-      <div className={styles.pageContent}>
-        {/* Crypto Holdings Table */}
-        <section className={styles.section}>
-          <div className={styles.sectionHeader}>
-            <h2 className={styles.sectionTitle}>Crypto Holdings</h2>
-            <button
-              className={styles.addButton}
-              onClick={() => setEditingHolding('new')}
-            >
-              + Add Holding
-            </button>
-          </div>
-          
-          {editingHolding === null && data.cryptoHoldings.length === 0 ? (
-            <div className={styles.emptyState}>
-              <p>No crypto holdings yet. Add your first holding to get started.</p>
-            </div>
-          ) : editingHolding === null ? (
-            <div className={styles.tableContainer}>
-              <table className={styles.holdingsTable}>
-                <thead>
-                  <tr>
-                    <th>Symbol</th>
-                    <th>Quantity</th>
-                    <th>Market Price</th>
-                    <th>AVG Price</th>
-                    <th>MV USD</th>
-                    <th>MV MYR</th>
-                    <th>P&L</th>
-                    <th>Account</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.cryptoHoldings.map((holding) => {
-                    // Crypto prices are always in USD, so calculation is straightforward
-                    const usdRate = holding.exchangeRate || 4.7; // Use stored rate or fallback
-                    const { usd: usdValue, myr: myrValue } = calculateCryptoHoldingMarketValue(holding, usdRate);
-                    const pnl = calculateCryptoHoldingPandL(holding, usdRate);
-                    
-                    return (
-                      <tr key={holding.id}>
-                        <td className={styles.codeCell}>
-                          <strong>{holding.symbol}</strong>
-                          {holding.name && <div className={styles.nameSubtext}>{holding.name}</div>}
-                        </td>
-                        <td>{holding.quantity.toFixed(8)}</td>
-                        <td>
-                          {holding.marketPrice 
-                            ? formatCurrency(holding.marketPrice, 'USD')
-                            : <span className={styles.noPrice}>No price</span>}
-                        </td>
-                        <td>{formatCurrency(holding.avgPrice, 'USD')}</td>
-                        <td>{formatCurrency(usdValue, 'USD')}</td>
-                        <td>{formatCurrency(myrValue, 'MYR')}</td>
-                        <td className={pnl.myr >= 0 ? styles.positive : styles.negative}>
-                          {formatCurrency(pnl.myr, 'MYR')} ({pnl.percentage.toFixed(1)}%)
-                        </td>
-                        <td>{holding.account}</td>
-                        <td>
-                          <div className={styles.actionButtons}>
-                            <button
-                              className={styles.editButton}
-                              onClick={() => setEditingHolding(holding)}
-                              title="Edit"
-                            >
-                              Edit
-                            </button>
-                            <button
-                              className={styles.deleteButton}
-                              onClick={() => {
-                                if (confirm('Delete this holding?')) {
-                                  deleteCryptoHolding(holding.id);
-                                }
-                              }}
-                              title="Delete"
-                            >
-                              Delete
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <CryptoHoldingForm
-              holding={editingHolding === 'new' ? undefined : editingHolding}
-              onCancel={() => setEditingHolding(null)}
-              accounts={data.cryptoAccounts}
-            />
-          )}
-        </section>
+      {/* Crypto Holdings Table */}
+      <section className="space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <h2 className="text-xl font-semibold tracking-tight">Crypto Holdings</h2>
+          <Button onClick={() => setEditingHolding('new')}>+ Add Holding</Button>
+        </div>
 
-        {/* Account Summary */}
-        <section className={styles.section}>
-          <div className={styles.sectionHeader}>
-            <h2 className={styles.sectionTitle}>Account Summary</h2>
-            <button
-              className={styles.addButton}
-              onClick={() => setEditingAccount('new')}
-            >
-              + Add Account
-            </button>
-          </div>
-          
-          {editingAccount === null ? (
-            accountSummary.length === 0 ? (
-              <div className={styles.emptyState}>
-                <p>No crypto accounts yet. Add your first account.</p>
-              </div>
-            ) : (
-              <div className={styles.tableContainer}>
-                <table className={styles.accountsTable}>
-                  <thead>
-                    <tr>
-                      <th>Account</th>
-                      <th>Current MYR</th>
-                      <th>Current USD</th>
-                      <th>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {accountSummary.map((account) => (
-                      <tr key={account.id}>
-                        <td><strong>{account.name}</strong></td>
-                        <td>{formatCurrency(account.currentMYR || 0, 'MYR')}</td>
-                        <td>{formatCurrency(account.currentUSD || 0, 'USD')}</td>
-                        <td>
-                          <div className={styles.actionButtons}>
-                            <button
-                              className={styles.editButton}
-                              onClick={() => setEditingAccount(account)}
-                              title="Edit"
-                            >
-                              Edit
-                            </button>
-                            <button
-                              className={styles.deleteButton}
-                              onClick={() => {
-                                if (confirm('Delete this account? This will not delete associated holdings.')) {
-                                  deleteCryptoAccount(account.id);
-                                }
-                              }}
-                              title="Delete"
-                            >
-                              Delete
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )
+        {editingHolding === null && data.cryptoHoldings.length === 0 ? (
+          <Card>
+            <CardContent>
+              <p className="py-8 text-center text-muted-foreground">No crypto holdings yet. Add your first holding to get started.</p>
+            </CardContent>
+          </Card>
+        ) : editingHolding === null ? (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Symbol</TableHead>
+                <TableHead>Quantity</TableHead>
+                <TableHead>Market Price</TableHead>
+                <TableHead>AVG Price</TableHead>
+                <TableHead>MV USD</TableHead>
+                <TableHead>MV MYR</TableHead>
+                <TableHead>P&L</TableHead>
+                <TableHead>Account</TableHead>
+                <TableHead>Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {data.cryptoHoldings.map((holding) => {
+                const usdRate = holding.exchangeRate || 4.7;
+                const { usd: usdValue, myr: myrValue } = calculateCryptoHoldingMarketValue(holding, usdRate);
+                const pnl = calculateCryptoHoldingPandL(holding, usdRate);
+
+                return (
+                  <TableRow key={holding.id}>
+                    <TableCell>
+                      <div>
+                        <span className="font-semibold">{holding.symbol}</span>
+                        {holding.name && <div className="text-xs text-muted-foreground">{holding.name}</div>}
+                      </div>
+                    </TableCell>
+                    <TableCell>{holding.quantity.toFixed(8)}</TableCell>
+                    <TableCell>
+                      {holding.marketPrice
+                        ? formatCurrency(holding.marketPrice, 'USD')
+                        : <span className="text-muted-foreground">No price</span>}
+                    </TableCell>
+                    <TableCell>{formatCurrency(holding.avgPrice, 'USD')}</TableCell>
+                    <TableCell>{formatCurrency(usdValue, 'USD')}</TableCell>
+                    <TableCell>{formatCurrency(myrValue, 'MYR')}</TableCell>
+                    <TableCell className={cn(pnl.myr >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400")}>
+                      {formatCurrency(pnl.myr, 'MYR')} ({pnl.percentage.toFixed(1)}%)
+                    </TableCell>
+                    <TableCell>{holding.account}</TableCell>
+                    <TableCell>
+                      <div className="flex gap-1">
+                        <Button
+                          variant="outline"
+                          size="xs"
+                          onClick={() => setEditingHolding(holding)}
+                        >
+                          Edit
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          size="xs"
+                          onClick={() => {
+                            if (confirm('Delete this holding?')) {
+                              deleteCryptoHolding(holding.id);
+                            }
+                          }}
+                        >
+                          Delete
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        ) : (
+          <CryptoHoldingForm
+            holding={editingHolding === 'new' ? undefined : editingHolding}
+            onCancel={() => setEditingHolding(null)}
+            accounts={data.cryptoAccounts}
+          />
+        )}
+      </section>
+
+      {/* Account Summary */}
+      <section className="space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <h2 className="text-xl font-semibold tracking-tight">Account Summary</h2>
+          <Button onClick={() => setEditingAccount('new')}>+ Add Account</Button>
+        </div>
+
+        {editingAccount === null ? (
+          accountSummary.length === 0 ? (
+            <Card>
+              <CardContent>
+                <p className="py-8 text-center text-muted-foreground">No crypto accounts yet. Add your first account.</p>
+              </CardContent>
+            </Card>
           ) : (
-            <CryptoAccountForm
-              account={editingAccount === 'new' ? undefined : editingAccount}
-              onCancel={() => setEditingAccount(null)}
-            />
-          )}
-        </section>
-      </div>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Account</TableHead>
+                  <TableHead>Current MYR</TableHead>
+                  <TableHead>Current USD</TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {accountSummary.map((account) => (
+                  <TableRow key={account.id}>
+                    <TableCell className="font-medium">{account.name}</TableCell>
+                    <TableCell>{formatCurrency(account.currentMYR || 0, 'MYR')}</TableCell>
+                    <TableCell>{formatCurrency(account.currentUSD || 0, 'USD')}</TableCell>
+                    <TableCell>
+                      <div className="flex gap-1">
+                        <Button
+                          variant="outline"
+                          size="xs"
+                          onClick={() => setEditingAccount(account)}
+                        >
+                          Edit
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          size="xs"
+                          onClick={() => {
+                            if (confirm('Delete this account? This will not delete associated holdings.')) {
+                              deleteCryptoAccount(account.id);
+                            }
+                          }}
+                        >
+                          Delete
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )
+        ) : (
+          <CryptoAccountForm
+            account={editingAccount === 'new' ? undefined : editingAccount}
+            onCancel={() => setEditingAccount(null)}
+          />
+        )}
+      </section>
     </div>
   );
 };
 
 export default CryptoTrackerPage;
-

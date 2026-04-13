@@ -1,8 +1,20 @@
-import React, { useState } from 'react';
+import React from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { useFinancialData } from '../../context/FinancialDataContext';
-import { TradingAccount } from '../../types/financial';
-import { getUSDToMYRRate } from '../../services/exchangeRateService';
-import styles from './Stocks.module.css';
+import type { TradingAccount } from '../../types/financial';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
+
+const tradingAccountFormSchema = z.object({
+  name: z.string().min(1, 'Account name is required'),
+  initialMYR: z.string().min(1, 'Initial MYR is required').refine(v => !isNaN(parseFloat(v)) && parseFloat(v) >= 0, 'Initial MYR must be 0 or greater'),
+  initialUSD: z.string().min(1, 'Initial USD is required').refine(v => !isNaN(parseFloat(v)) && parseFloat(v) >= 0, 'Initial USD must be 0 or greater'),
+});
+
+type TradingAccountFormValues = z.infer<typeof tradingAccountFormSchema>;
 
 interface TradingAccountFormProps {
   account?: TradingAccount;
@@ -11,41 +23,21 @@ interface TradingAccountFormProps {
 
 const TradingAccountForm: React.FC<TradingAccountFormProps> = ({ account, onCancel }) => {
   const { addTradingAccount, updateTradingAccount } = useFinancialData();
-  const [name, setName] = useState(account?.name || '');
-  const [initialMYR, setInitialMYR] = useState(account?.initialMYR.toString() || '');
-  const [initialUSD, setInitialUSD] = useState(account?.initialUSD.toString() || '');
-  const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const validate = (): boolean => {
-    const newErrors: Record<string, string> = {};
-    
-    if (!name.trim()) {
-      newErrors.name = 'Account name is required';
-    }
-    
-    if (!initialMYR || parseFloat(initialMYR) < 0) {
-      newErrors.initialMYR = 'Initial MYR must be 0 or greater';
-    }
-    
-    if (!initialUSD || parseFloat(initialUSD) < 0) {
-      newErrors.initialUSD = 'Initial USD must be 0 or greater';
-    }
-    
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
+  const form = useForm<TradingAccountFormValues>({
+    resolver: zodResolver(tradingAccountFormSchema),
+    defaultValues: {
+      name: account?.name || '',
+      initialMYR: account?.initialMYR.toString() || '',
+      initialUSD: account?.initialUSD.toString() || '',
+    },
+  });
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!validate()) {
-      return;
-    }
-
+  const onSubmit = async (values: TradingAccountFormValues) => {
     const accountData: Omit<TradingAccount, 'id'> = {
-      name: name.trim(),
-      initialMYR: parseFloat(initialMYR),
-      initialUSD: parseFloat(initialUSD),
+      name: values.name.trim(),
+      initialMYR: parseFloat(values.initialMYR),
+      initialUSD: parseFloat(values.initialUSD),
     };
 
     if (account) {
@@ -53,83 +45,62 @@ const TradingAccountForm: React.FC<TradingAccountFormProps> = ({ account, onCanc
       onCancel();
     } else {
       addTradingAccount(accountData);
-      setName('');
-      setInitialMYR('');
-      setInitialUSD('');
+      form.reset({
+        name: '',
+        initialMYR: '',
+        initialUSD: '',
+      });
     }
-    setErrors({});
   };
 
   return (
-    <div className={styles.formCard}>
-      <h3 className={styles.formTitle}>{account ? 'Edit Trading Account' : 'Add Trading Account'}</h3>
-      <form onSubmit={handleSubmit} className={styles.form}>
-        <div className={styles.formGroup}>
-          <label htmlFor="account-name" className={styles.label}>
-            Account Name
-            <span className={styles.tooltip} title="Enter the account name (e.g., etoro, tiger, futu, webull)">
-              i
-            </span>
-          </label>
-          <input
-            id="account-name"
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className={styles.input}
-            placeholder="e.g., etoro"
-          />
-          {errors.name && <span className={styles.error}>{errors.name}</span>}
-        </div>
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <FormField control={form.control} name="name" render={({ field }) => (
+              <FormItem>
+                <FormLabel title="Enter the account name (e.g., etoro, tiger, futu, webull)">
+                  Account Name
+                </FormLabel>
+                <FormControl>
+                  <Input placeholder="e.g., etoro" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
 
-        <div className={styles.formRow}>
-          <div className={styles.formGroup}>
-            <label htmlFor="account-initial-myr" className={styles.label}>
-              Initial Investment (MYR)
-            </label>
-            <input
-              id="account-initial-myr"
-              type="number"
-              step="0.01"
-              min="0"
-              value={initialMYR}
-              onChange={(e) => setInitialMYR(e.target.value)}
-              className={styles.input}
-              placeholder="0.00"
-            />
-            {errors.initialMYR && <span className={styles.error}>{errors.initialMYR}</span>}
-          </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <FormField control={form.control} name="initialMYR" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Initial Investment (MYR)</FormLabel>
+                  <FormControl>
+                    <Input type="number" step="0.01" min="0" placeholder="0.00" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
 
-          <div className={styles.formGroup}>
-            <label htmlFor="account-initial-usd" className={styles.label}>
-              Initial Investment (USD)
-            </label>
-            <input
-              id="account-initial-usd"
-              type="number"
-              step="0.01"
-              min="0"
-              value={initialUSD}
-              onChange={(e) => setInitialUSD(e.target.value)}
-              className={styles.input}
-              placeholder="0.00"
-            />
-            {errors.initialUSD && <span className={styles.error}>{errors.initialUSD}</span>}
-          </div>
-        </div>
+              <FormField control={form.control} name="initialUSD" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Initial Investment (USD)</FormLabel>
+                  <FormControl>
+                    <Input type="number" step="0.01" min="0" placeholder="0.00" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+            </div>
 
-        <div className={styles.formActions}>
-          <button type="submit" className={styles.submitButton}>
-            {account ? 'Update Account' : 'Add Account'}
-          </button>
-          <button type="button" onClick={onCancel} className={styles.cancelButton}>
-            Cancel
-          </button>
-        </div>
+            <div className="flex gap-3 pt-2">
+              <Button type="submit">
+                {account ? 'Update Account' : 'Add Account'}
+              </Button>
+              <Button type="button" variant="outline" onClick={onCancel}>
+                Cancel
+              </Button>
+            </div>
       </form>
-    </div>
+    </Form>
   );
 };
 
 export default TradingAccountForm;
-

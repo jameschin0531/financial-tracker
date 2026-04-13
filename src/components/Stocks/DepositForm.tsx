@@ -1,7 +1,24 @@
-import React, { useState } from 'react';
+import React from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { useFinancialData } from '../../context/FinancialDataContext';
-import { Deposit } from '../../types/financial';
-import styles from './Stocks.module.css';
+import type { Deposit } from '../../types/financial';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
+const depositFormSchema = z.object({
+  account: z.string().min(1, 'Account is required'),
+  date: z.string().min(1, 'Date is required'),
+  amount: z.string().min(1, 'Amount is required').refine(v => !isNaN(parseFloat(v)) && parseFloat(v) > 0, 'Amount must be greater than 0'),
+  usd: z.string().optional().or(z.literal('')),
+  sgd: z.string().optional().or(z.literal('')),
+  aud: z.string().optional().or(z.literal('')),
+});
+
+type DepositFormValues = z.infer<typeof depositFormSchema>;
 
 interface DepositFormProps {
   deposit?: Deposit;
@@ -11,47 +28,27 @@ interface DepositFormProps {
 
 const DepositForm: React.FC<DepositFormProps> = ({ deposit, onCancel, accounts }) => {
   const { addDeposit, updateDeposit } = useFinancialData();
-  const [account, setAccount] = useState(deposit?.account || accounts[0] || '');
-  const [date, setDate] = useState(deposit?.date || new Date().toISOString().split('T')[0]);
-  const [amount, setAmount] = useState(deposit?.amount.toString() || '');
-  const [usd, setUSD] = useState(deposit?.usd?.toString() || '');
-  const [sgd, setSGD] = useState(deposit?.sgd?.toString() || '');
-  const [aud, setAUD] = useState(deposit?.aud?.toString() || '');
-  const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const validate = (): boolean => {
-    const newErrors: Record<string, string> = {};
-    
-    if (!account) {
-      newErrors.account = 'Account is required';
-    }
-    
-    if (!date) {
-      newErrors.date = 'Date is required';
-    }
-    
-    if (!amount || parseFloat(amount) <= 0) {
-      newErrors.amount = 'Amount must be greater than 0';
-    }
-    
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
+  const form = useForm<DepositFormValues>({
+    resolver: zodResolver(depositFormSchema),
+    defaultValues: {
+      account: deposit?.account || accounts[0] || '',
+      date: deposit?.date || new Date().toISOString().split('T')[0],
+      amount: deposit?.amount.toString() || '',
+      usd: deposit?.usd?.toString() || '',
+      sgd: deposit?.sgd?.toString() || '',
+      aud: deposit?.aud?.toString() || '',
+    },
+  });
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!validate()) {
-      return;
-    }
-
+  const onSubmit = (values: DepositFormValues) => {
     const depositData: Omit<Deposit, 'id'> = {
-      account,
-      date,
-      amount: parseFloat(amount),
-      usd: usd ? parseFloat(usd) : undefined,
-      sgd: sgd ? parseFloat(sgd) : undefined,
-      aud: aud ? parseFloat(aud) : undefined,
+      account: values.account,
+      date: values.date,
+      amount: parseFloat(values.amount),
+      usd: values.usd ? parseFloat(values.usd) : undefined,
+      sgd: values.sgd ? parseFloat(values.sgd) : undefined,
+      aud: values.aud ? parseFloat(values.aud) : undefined,
     };
 
     if (deposit) {
@@ -59,135 +56,106 @@ const DepositForm: React.FC<DepositFormProps> = ({ deposit, onCancel, accounts }
       onCancel();
     } else {
       addDeposit(depositData);
-      setAccount(accounts[0] || '');
-      setDate(new Date().toISOString().split('T')[0]);
-      setAmount('');
-      setUSD('');
-      setSGD('');
-      setAUD('');
+      form.reset({
+        account: accounts[0] || '',
+        date: new Date().toISOString().split('T')[0],
+        amount: '',
+        usd: '',
+        sgd: '',
+        aud: '',
+      });
     }
-    setErrors({});
   };
 
   return (
-    <div className={styles.formCard}>
-      <h3 className={styles.formTitle}>{deposit ? 'Edit Deposit' : 'Add Deposit'}</h3>
-      <form onSubmit={handleSubmit} className={styles.form}>
-        <div className={styles.formRow}>
-          <div className={styles.formGroup}>
-            <label htmlFor="deposit-account" className={styles.label}>
-              Account
-            </label>
-            <select
-              id="deposit-account"
-              value={account}
-              onChange={(e) => setAccount(e.target.value)}
-              className={styles.select}
-            >
-              {accounts.map(acc => (
-                <option key={acc} value={acc}>{acc}</option>
-              ))}
-            </select>
-            {errors.account && <span className={styles.error}>{errors.account}</span>}
-          </div>
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <FormField control={form.control} name="account" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Account</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select account" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {accounts.map(acc => (
+                        <SelectItem key={acc} value={acc}>{acc}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )} />
 
-          <div className={styles.formGroup}>
-            <label htmlFor="deposit-date" className={styles.label}>
-              Date
-            </label>
-            <input
-              id="deposit-date"
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              className={styles.input}
-            />
-            {errors.date && <span className={styles.error}>{errors.date}</span>}
-          </div>
-        </div>
+              <FormField control={form.control} name="date" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Date</FormLabel>
+                  <FormControl>
+                    <Input type="date" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+            </div>
 
-        <div className={styles.formGroup}>
-          <label htmlFor="deposit-amount" className={styles.label}>
-            Amount (MYR)
-            <span className={styles.tooltip} title="Enter the deposit amount in Malaysian Ringgit">
-              i
-            </span>
-          </label>
-          <input
-            id="deposit-amount"
-            type="number"
-            step="0.01"
-            min="0"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            className={styles.input}
-            placeholder="0.00"
-          />
-          {errors.amount && <span className={styles.error}>{errors.amount}</span>}
-        </div>
+            <FormField control={form.control} name="amount" render={({ field }) => (
+              <FormItem>
+                <FormLabel title="Enter the deposit amount in Malaysian Ringgit">
+                  Amount (MYR)
+                </FormLabel>
+                <FormControl>
+                  <Input type="number" step="0.01" min="0" placeholder="0.00" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
 
-        <div className={styles.formRow}>
-          <div className={styles.formGroup}>
-            <label htmlFor="deposit-usd" className={styles.label}>
-              USD (Optional)
-            </label>
-            <input
-              id="deposit-usd"
-              type="number"
-              step="0.01"
-              min="0"
-              value={usd}
-              onChange={(e) => setUSD(e.target.value)}
-              className={styles.input}
-              placeholder="0.00"
-            />
-          </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <FormField control={form.control} name="usd" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>USD (Optional)</FormLabel>
+                  <FormControl>
+                    <Input type="number" step="0.01" min="0" placeholder="0.00" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
 
-          <div className={styles.formGroup}>
-            <label htmlFor="deposit-sgd" className={styles.label}>
-              SGD (Optional)
-            </label>
-            <input
-              id="deposit-sgd"
-              type="number"
-              step="0.01"
-              min="0"
-              value={sgd}
-              onChange={(e) => setSGD(e.target.value)}
-              className={styles.input}
-              placeholder="0.00"
-            />
-          </div>
+              <FormField control={form.control} name="sgd" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>SGD (Optional)</FormLabel>
+                  <FormControl>
+                    <Input type="number" step="0.01" min="0" placeholder="0.00" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
 
-          <div className={styles.formGroup}>
-            <label htmlFor="deposit-aud" className={styles.label}>
-              AUD (Optional)
-            </label>
-            <input
-              id="deposit-aud"
-              type="number"
-              step="0.01"
-              min="0"
-              value={aud}
-              onChange={(e) => setAUD(e.target.value)}
-              className={styles.input}
-              placeholder="0.00"
-            />
-          </div>
-        </div>
+              <FormField control={form.control} name="aud" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>AUD (Optional)</FormLabel>
+                  <FormControl>
+                    <Input type="number" step="0.01" min="0" placeholder="0.00" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+            </div>
 
-        <div className={styles.formActions}>
-          <button type="submit" className={styles.submitButton}>
-            {deposit ? 'Update Deposit' : 'Add Deposit'}
-          </button>
-          <button type="button" onClick={onCancel} className={styles.cancelButton}>
-            Cancel
-          </button>
-        </div>
+            <div className="flex gap-3 pt-2">
+              <Button type="submit">
+                {deposit ? 'Update Deposit' : 'Add Deposit'}
+              </Button>
+              <Button type="button" variant="outline" onClick={onCancel}>
+                Cancel
+              </Button>
+            </div>
       </form>
-    </div>
+    </Form>
   );
 };
 
 export default DepositForm;
-

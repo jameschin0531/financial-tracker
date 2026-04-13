@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid } from 'recharts';
+import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent, type ChartConfig } from '@/components/ui/chart';
 import { useFinancialData } from '../../context/FinancialDataContext';
 import { useAuth } from '../../context/AuthContext';
 import { buildWeeklyNetWorthSeries, getNetWorthHistory, startOfWeekISO } from '../../services/calculations';
@@ -66,31 +67,52 @@ const createWeeklyRowsFromDaily = (
   }));
 };
 
+const chartConfig = {
+  netWorth: {
+    label: 'Net Worth',
+    color: 'var(--color-chart-1)',
+  },
+} satisfies ChartConfig;
+
+const hasFinancialData = (data: { assets: unknown[]; liabilities: unknown[]; stockHoldings: unknown[]; cryptoHoldings: unknown[] }): boolean =>
+  data.assets.length > 0 || data.liabilities.length > 0 || data.stockHoldings.length > 0 || data.cryptoHoldings.length > 0;
+
 const NetWorthChart: React.FC = () => {
   const { data } = useFinancialData();
   const { user } = useAuth();
   const [history, setHistory] = useState<Array<{ date: string; netWorth: number }>>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Skip if financial data hasn't loaded yet
+    if (!hasFinancialData(data)) {
+      setLoading(false);
+      return;
+    }
+
     let cancelled = false;
+    setLoading(true);
 
     const loadHistory = async () => {
-      const localHistory = await getNetWorthHistory(data);
-      const localWeeklyFallback = buildWeeklyNetWorthSeries([], localHistory.map((point) => ({
-        date: point.date,
-        netWorth: point.netWorth,
-      })));
-
-      if (!user || !isSupabaseInitialized()) {
-        if (!cancelled) {
-          setHistory(localWeeklyFallback);
-        }
-        return;
-      }
-
       try {
+        const localHistory = await getNetWorthHistory(data);
+        const localWeeklyFallback = buildWeeklyNetWorthSeries([], localHistory.map((point) => ({
+          date: point.date,
+          netWorth: point.netWorth,
+        })));
+
+        if (!user || !isSupabaseInitialized()) {
+          if (!cancelled) {
+            // Use daily history directly if weekly aggregation produces too few points
+            setHistory(localWeeklyFallback.length >= 2 ? localWeeklyFallback : localHistory);
+            setLoading(false);
+          }
+          return;
+        }
+
         const supabase = getSupabase();
 
+        // Write today's snapshot (fire-and-forget, don't block reads)
         if (localHistory.length > 0) {
           const todayIso = toISODate(new Date());
           const todayPoint = localHistory.find((point) => point.date === todayIso) ?? localHistory[localHistory.length - 1];
@@ -98,29 +120,20 @@ const NetWorthChart: React.FC = () => {
           if (todayPoint) {
             const weekStart = startOfWeekISO(todayPoint.date);
 
-            await Promise.all([
+            Promise.all([
               supabase
                 .from('net_worth_daily')
-                .upsert([
-                  {
-                    user_id: user.id,
-                    date: todayPoint.date,
-                    net_worth: todayPoint.netWorth,
-                  },
-                ], { onConflict: 'user_id,date' }),
+                .upsert([{ user_id: user.id, date: todayPoint.date, net_worth: todayPoint.netWorth }], { onConflict: 'user_id,date' }),
               supabase
                 .from('net_worth_snapshots')
-                .upsert([
-                  {
-                    user_id: user.id,
-                    week_start: weekStart,
-                    net_worth: todayPoint.netWorth,
-                  },
-                ], { onConflict: 'user_id,week_start' }),
-            ]);
+                .upsert([{ user_id: user.id, week_start: weekStart, net_worth: todayPoint.netWorth }], { onConflict: 'user_id,week_start' }),
+            ]).catch(() => {
+              // Non-critical write failure
+            });
           }
         }
 
+        // Read from Supabase
         const [weeklyResult, dailyResult] = await Promise.all([
           supabase
             .from('net_worth_snapshots')
@@ -134,51 +147,25 @@ const NetWorthChart: React.FC = () => {
             .order('date', { ascending: true }),
         ]);
 
-        if (weeklyResult.error) {
-          console.warn('Failed to read net worth weekly snapshots:', weeklyResult.error);
-        }
-
-        if (dailyResult.error) {
-          console.warn('Failed to read net worth daily snapshots:', dailyResult.error);
-        }
-
         let weeklyRows = (weeklyResult.data || []) as NetWorthWeeklyRow[];
         let dailyRows = (dailyResult.data || []) as NetWorthDailyRow[];
 
+        // Bootstrap DB if empty
         if (weeklyRows.length === 0 && dailyRows.length === 0 && localHistory.length > 0) {
           const bootstrapDailyRows = localHistory.map((point) => ({
             user_id: user.id,
             date: point.date,
             net_worth: point.netWorth,
           }));
-
           const bootstrapWeeklyRows = createWeeklyRowsFromDaily(user.id, localHistory);
 
-          const [dailyBootstrapResult, weeklyBootstrapResult] = await Promise.all([
-            supabase
-              .from('net_worth_daily')
-              .upsert(bootstrapDailyRows, { onConflict: 'user_id,date' }),
-            supabase
-              .from('net_worth_snapshots')
-              .upsert(bootstrapWeeklyRows, { onConflict: 'user_id,week_start' }),
-          ]);
+          await Promise.all([
+            supabase.from('net_worth_daily').upsert(bootstrapDailyRows, { onConflict: 'user_id,date' }),
+            supabase.from('net_worth_snapshots').upsert(bootstrapWeeklyRows, { onConflict: 'user_id,week_start' }),
+          ]).catch(() => {});
 
-          if (dailyBootstrapResult.error) {
-            console.warn('Failed to bootstrap net worth daily snapshots:', dailyBootstrapResult.error);
-          }
-
-          if (weeklyBootstrapResult.error) {
-            console.warn('Failed to bootstrap net worth weekly snapshots:', weeklyBootstrapResult.error);
-          }
-
-          dailyRows = bootstrapDailyRows.map((row) => ({
-            date: row.date,
-            net_worth: row.net_worth,
-          }));
-          weeklyRows = bootstrapWeeklyRows.map((row) => ({
-            week_start: row.week_start,
-            net_worth: row.net_worth,
-          }));
+          dailyRows = bootstrapDailyRows.map((row) => ({ date: row.date, net_worth: row.net_worth }));
+          weeklyRows = bootstrapWeeklyRows.map((row) => ({ week_start: row.week_start, net_worth: row.net_worth }));
         }
 
         const dbWeeklyHistory = buildWeeklyNetWorthSeries(
@@ -187,12 +174,27 @@ const NetWorthChart: React.FC = () => {
         );
 
         if (!cancelled) {
-          setHistory(dbWeeklyHistory.length > 0 ? dbWeeklyHistory : localWeeklyFallback);
+          // Prefer DB data, fall back to local weekly, fall back to local daily
+          if (dbWeeklyHistory.length >= 2) {
+            setHistory(dbWeeklyHistory);
+          } else if (localWeeklyFallback.length >= 2) {
+            setHistory(localWeeklyFallback);
+          } else {
+            setHistory(localHistory);
+          }
+          setLoading(false);
         }
       } catch (e) {
-        console.warn('Failed to read net worth snapshots from DB:', e);
+        console.warn('Failed to load net worth history:', e);
         if (!cancelled) {
-          setHistory(localWeeklyFallback);
+          // Last resort: compute directly from current data
+          try {
+            const localHistory = await getNetWorthHistory(data);
+            setHistory(localHistory);
+          } catch {
+            setHistory([]);
+          }
+          setLoading(false);
         }
       }
     };
@@ -204,9 +206,18 @@ const NetWorthChart: React.FC = () => {
     };
   }, [data, user]);
 
+  if (loading) {
+    return (
+      <div className="space-y-3">
+        <div className="h-4 w-40 rounded bg-muted animate-pulse" />
+        <div className="h-[300px] w-full rounded-lg bg-muted animate-pulse" />
+      </div>
+    );
+  }
+
   if (history.length === 0) {
     return (
-      <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+      <div className="py-8 text-center text-muted-foreground">
         Add assets and liabilities to see net worth history
       </div>
     );
@@ -214,7 +225,7 @@ const NetWorthChart: React.FC = () => {
 
   const chartData = history.map(item => ({
     date: formatDate(item.date),
-    'Net Worth': item.netWorth,
+    netWorth: item.netWorth,
   }));
   const [yAxisMin, yAxisMax] = getNetWorthYAxisDomain(history.map((item) => item.netWorth));
 
@@ -224,53 +235,49 @@ const NetWorthChart: React.FC = () => {
   return (
     <div>
       {lastUpdatedLabel && (
-        <div style={{ marginBottom: '0.5rem', color: 'var(--text-secondary)', fontSize: '0.75rem' }}>
+        <div className="mb-2 text-muted-foreground text-xs">
           {lastUpdatedLabel}
         </div>
       )}
-      <ResponsiveContainer width="100%" height={300}>
+      <ChartContainer config={chartConfig} className="h-[300px] w-full">
         <LineChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" strokeOpacity={0.3} vertical={false} />
+          <CartesianGrid strokeDasharray="3 3" vertical={false} />
           <XAxis
             dataKey="date"
-            stroke="var(--text-secondary)"
-            style={{ fontSize: '0.75rem' }}
-            axisLine={false}
             tickLine={false}
+            axisLine={false}
+            tickMargin={8}
+            style={{ fontSize: '0.75rem' }}
           />
           <YAxis
-            stroke="var(--text-secondary)"
-            style={{ fontSize: '0.75rem' }}
+            tickLine={false}
+            axisLine={false}
+            tickMargin={8}
             domain={[yAxisMin, yAxisMax]}
             tickFormatter={(value) => formatCurrency(value)}
-            axisLine={false}
-            tickLine={false}
+            style={{ fontSize: '0.75rem' }}
           />
-          <Tooltip
-            contentStyle={{
-              backgroundColor: 'var(--bg-card)',
-              border: '1px solid var(--border-color)',
-              borderRadius: '12px',
-              boxShadow: '0 8px 32px var(--shadow)',
-              padding: '12px 16px',
-            }}
-            formatter={(value: number) => formatCurrency(value)}
-            cursor={{ stroke: 'var(--border-color)', strokeWidth: 1, strokeDasharray: '4 4' }}
+          <ChartTooltip
+            content={
+              <ChartTooltipContent
+                formatter={(value) => formatCurrency(Number(value))}
+              />
+            }
+            cursor={{ strokeDasharray: '4 4' }}
           />
-          <Legend wrapperStyle={{ paddingTop: '20px' }} />
+          <ChartLegend content={<ChartLegendContent />} />
           <Line
             type="monotone"
-            dataKey="Net Worth"
-            stroke="var(--accent-color)"
+            dataKey="netWorth"
+            stroke="var(--color-chart-1)"
             strokeWidth={3}
-            dot={{ fill: 'var(--bg-card)', stroke: 'var(--accent-color)', strokeWidth: 2, r: 4 }}
-            activeDot={{ r: 6, strokeWidth: 0, fill: 'var(--accent-color)' }}
+            dot={{ fill: 'var(--color-background)', stroke: 'var(--color-chart-1)', strokeWidth: 2, r: 4 }}
+            activeDot={{ r: 6, strokeWidth: 0, fill: 'var(--color-chart-1)' }}
           />
         </LineChart>
-      </ResponsiveContainer>
+      </ChartContainer>
     </div>
   );
 };
 
 export default NetWorthChart;
-

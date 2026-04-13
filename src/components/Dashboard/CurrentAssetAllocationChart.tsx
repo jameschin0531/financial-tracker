@@ -19,4 +19,3 @@ const CurrentAssetAllocationChart: React.FC = () => {
 };
 
 export default CurrentAssetAllocationChart;
-

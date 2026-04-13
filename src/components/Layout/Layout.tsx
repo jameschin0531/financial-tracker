@@ -1,7 +1,5 @@
-import React, { ReactNode, useState } from 'react';
-import Sidebar from './Sidebar';
+import React, { type ReactNode } from 'react';
 import Header from './Header';
-import styles from './Layout.module.css';
 
 interface LayoutProps {
   children: ReactNode;
@@ -11,39 +9,12 @@ interface LayoutProps {
 }
 
 const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageChange, amountVisibility }) => {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-
-  const handlePageChange = (page: string) => {
-    onPageChange(page);
-    setSidebarOpen(false); // Close sidebar on mobile after navigation
-  };
-
   return (
-    <div className={styles.layout} data-amount-visibility={amountVisibility}>
-      <div className={`${styles.sidebarWrapper} ${sidebarCollapsed ? styles.sidebarCollapsed : ''}`}>
-        <div className={`${styles.sidebarContainer} ${sidebarOpen ? styles.sidebarOpen : ''}`}>
-          <Sidebar
-            currentPage={currentPage}
-            onPageChange={handlePageChange}
-            collapsed={sidebarCollapsed}
-            onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
-          />
-        </div>
-        {sidebarOpen && (
-          <div
-            className={styles.overlay}
-            onClick={() => setSidebarOpen(false)}
-            aria-hidden="true"
-          />
-        )}
-      </div>
-      <div className={styles.mainContent}>
-        <Header onMenuClick={() => setSidebarOpen(!sidebarOpen)} />
-        <main className={styles.main}>
-          {children}
-        </main>
-      </div>
+    <div className="min-h-screen flex flex-col" data-amount-visibility={amountVisibility}>
+      <Header currentPage={currentPage} onPageChange={onPageChange} />
+      <main className="flex-1 px-3 py-4 sm:px-4 md:px-6 lg:px-8 overflow-x-hidden">
+        {children}
+      </main>
     </div>
   );
 };
