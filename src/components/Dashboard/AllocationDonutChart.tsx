@@ -1,18 +1,20 @@
-import React from 'react';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
+import React, { useMemo } from 'react';
+import { Pie, PieChart, Cell } from 'recharts';
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  type ChartConfig,
+} from '@/components/ui/chart';
 import { formatCurrency } from '../../utils/formatters';
 import { buildAllocationBreakdown } from './allocationChartUtils';
-import styles from './Dashboard.module.css';
 
-const COLORS = [
-  'var(--accent-color)',
-  'var(--success-color)',
-  'var(--warning-color)',
-  '#c4b5fd',
-  '#f97316',
-  '#7c3aed',
-  '#6d28d9',
-  '#fb7185',
+const CHART_COLORS = [
+  'var(--color-chart-1)',
+  'var(--color-chart-2)',
+  'var(--color-chart-3)',
+  'var(--color-chart-4)',
+  'var(--color-chart-5)',
 ];
 
 interface AllocationDonutChartProps {
@@ -21,84 +23,87 @@ interface AllocationDonutChartProps {
 }
 
 const AllocationDonutChart: React.FC<AllocationDonutChartProps> = ({ allocation, emptyMessage }) => {
-  const rows = buildAllocationBreakdown(allocation, COLORS, 6);
+  const rows = buildAllocationBreakdown(allocation, CHART_COLORS, 6);
+
+  const chartConfig = useMemo(() => {
+    const config: ChartConfig = {};
+    rows.forEach((row, index) => {
+      config[row.name] = {
+        label: row.name,
+        color: CHART_COLORS[index % CHART_COLORS.length],
+      };
+    });
+    return config;
+  }, [rows]);
+
+  const total = useMemo(() => rows.reduce((sum, row) => sum + row.value, 0), [rows]);
 
   if (rows.length === 0) {
     return (
-      <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+      <div className="py-8 text-center text-muted-foreground">
         {emptyMessage}
       </div>
     );
   }
 
-  const total = rows.reduce((sum, row) => sum + row.value, 0);
-
   return (
-    <div className={styles.allocationLayout}>
-      <div className={styles.allocationChartCanvas}>
-        <ResponsiveContainer width="100%" height={280}>
-          <PieChart>
-            <Pie
-              data={rows}
-              cx="50%"
-              cy="50%"
-              innerRadius={58}
-              outerRadius={94}
-              paddingAngle={2}
-              labelLine={false}
-              label={false}
-              dataKey="value"
-              nameKey="name"
-              stroke="var(--bg-card)"
-              strokeWidth={2}
-            >
-              {rows.map((entry, index) => (
-                <Cell key={`${entry.name}-${index}`} fill={entry.color} />
-              ))}
-            </Pie>
-            <Tooltip
-              contentStyle={{
-                backgroundColor: 'var(--bg-card)',
-                border: '1px solid var(--border-color)',
-                borderRadius: '8px',
-                color: 'var(--text-primary)',
-              }}
-              itemStyle={{ color: 'var(--text-primary)' }}
-              labelStyle={{ color: 'var(--text-secondary)' }}
-              labelFormatter={(name) => String(name)}
-              formatter={(value, _name, item) => {
-                const numericValue = Number(value) || 0;
-                const percentage = Number((item as { payload?: { percentage?: number } })?.payload?.percentage ?? 0);
-                const name = String((item as { payload?: { name?: string } })?.payload?.name ?? '');
-                return [`${formatCurrency(numericValue)} (${percentage.toFixed(1)}%)`, name];
-              }}
-            />
-          </PieChart>
-        </ResponsiveContainer>
+    <div className="space-y-4">
+      <ChartContainer config={chartConfig} className="mx-auto aspect-square max-h-[250px]">
+        <PieChart>
+          <ChartTooltip
+            content={
+              <ChartTooltipContent
+                formatter={(value) => {
+                  const numericValue = Number(value) || 0;
+                  const pct = total > 0 ? ((numericValue / total) * 100).toFixed(1) : '0';
+                  return `${formatCurrency(numericValue)} (${pct}%)`;
+                }}
+              />
+            }
+          />
+          <Pie
+            data={rows}
+            dataKey="value"
+            nameKey="name"
+            cx="50%"
+            cy="50%"
+            innerRadius={55}
+            outerRadius={90}
+            paddingAngle={2}
+            strokeWidth={2}
+          >
+            {rows.map((entry, index) => (
+              <Cell
+                key={`${entry.name}-${index}`}
+                fill={entry.color}
+                stroke="var(--color-background)"
+              />
+            ))}
+          </Pie>
+        </PieChart>
+      </ChartContainer>
+
+      <div className="flex items-center justify-between border-b border-border pb-2 mb-1">
+        <span className="text-sm font-medium">Total</span>
+        <span className="text-sm font-bold tabular-nums">{formatCurrency(total)}</span>
       </div>
 
-      <div className={styles.allocationBreakdown}>
-        <div className={styles.allocationBreakdownHeader}>
-          <span>Category</span>
-          <span>Portion</span>
-          <span>Value</span>
-        </div>
-
+      <div className="space-y-2">
         {rows.map((row) => (
-          <div key={row.name} className={styles.allocationBreakdownRow}>
-            <div className={styles.allocationCategory}>
-              <span className={styles.allocationDot} style={{ backgroundColor: row.color }} aria-hidden="true" />
-              <span className={styles.allocationCategoryName}>{row.name}</span>
+          <div key={row.name} className="flex items-center justify-between text-sm">
+            <div className="flex items-center gap-2 min-w-0">
+              <span
+                className="size-2.5 rounded-full shrink-0"
+                style={{ backgroundColor: row.color }}
+              />
+              <span className="truncate text-muted-foreground">{row.name}</span>
             </div>
-            <span className={styles.allocationPortion}>{row.percentage.toFixed(1)}%</span>
-            <span className={styles.allocationValue}>{formatCurrency(row.value)}</span>
+            <div className="flex items-center gap-3 shrink-0 ml-2">
+              <span className="font-medium tabular-nums">{formatCurrency(row.value)}</span>
+              <span className="text-muted-foreground text-xs w-12 text-right tabular-nums">{row.percentage.toFixed(1)}%</span>
+            </div>
           </div>
         ))}
-
-        <div className={styles.allocationTotalRow}>
-          <span>Total</span>
-          <span>{formatCurrency(total)}</span>
-        </div>
       </div>
     </div>
   );

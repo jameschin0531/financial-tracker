@@ -1,5 +1,6 @@
-import React from 'react';
-import styles from './Dashboard.module.css';
+import type React from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { cn } from '@/lib/utils';
 
 interface MetricsCardProps {
   title: string;
@@ -9,16 +10,34 @@ interface MetricsCardProps {
   icon?: React.ReactNode;
 }
 
-const MetricsCard: React.FC<MetricsCardProps> = ({ title, value, subtitle, trend = 'neutral', icon }) => {
+const MetricsCard = ({ title, value, subtitle, trend = 'neutral', icon }: MetricsCardProps) => {
   return (
-    <div className={styles.metricsCard}>
-      {icon && <div className={styles.metricsIcon}>{icon}</div>}
-      <h3 className={styles.metricsTitle}>{title}</h3>
-      <div className={`${styles.metricsValue} ${styles[`trend-${trend}`]}`} title={value}>
-        {value}
-      </div>
-      {subtitle && <p className={styles.metricsSubtitle}>{subtitle}</p>}
-    </div>
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-sm font-medium">{title}</CardTitle>
+        {icon && (
+          <div className="text-muted-foreground">
+            {icon}
+          </div>
+        )}
+      </CardHeader>
+      <CardContent>
+        <div
+          className={cn(
+            'text-2xl font-bold tabular-nums tracking-tight',
+            trend === 'positive' && 'text-emerald-500',
+            trend === 'negative' && 'text-red-500',
+            trend === 'neutral' && 'text-foreground',
+          )}
+          title={value}
+        >
+          {value}
+        </div>
+        {subtitle && (
+          <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>
+        )}
+      </CardContent>
+    </Card>
   );
 };
 

@@ -1,8 +1,25 @@
 import React, { useState, useEffect } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { useFinancialData } from '../../context/FinancialDataContext';
 import type { Asset, Currency } from '../../types/financial';
 import { getUSDToMYRRate } from '../../services/exchangeRateService';
-import styles from './Forms.module.css';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Form, FormField, FormItem, FormLabel, FormControl, FormDescription, FormMessage } from '@/components/ui/form';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
+const assetFormSchema = z.object({
+  name: z.string().min(1, 'Asset name is required'),
+  assetType: z.enum(['current', 'fixed']),
+  category: z.string().min(1, 'Category is required'),
+  currency: z.enum(['MYR', 'USD']),
+  value: z.string().min(1, 'Value is required').refine(v => !isNaN(parseFloat(v)) && parseFloat(v) > 0, 'Value must be greater than 0'),
+  date: z.string().min(1, 'Date is required'),
+});
+
+type AssetFormValues = z.infer<typeof assetFormSchema>;
 
 interface AssetFormProps {
   editingAsset?: Asset;
@@ -11,122 +28,88 @@ interface AssetFormProps {
 
 const AssetForm: React.FC<AssetFormProps> = ({ editingAsset, onCancel }) => {
   const { data, addAsset, updateAsset, addAssetCategory } = useFinancialData();
-  const [name, setName] = useState(editingAsset?.name || '');
-  const [category, setCategory] = useState(editingAsset?.category || data.assetCategories[0] || '');
-  const [newCategory, setNewCategory] = useState('');
   const [showNewCategory, setShowNewCategory] = useState(false);
-  const [assetType, setAssetType] = useState<'current' | 'fixed'>(editingAsset?.assetType || 'current');
-  const [currency, setCurrency] = useState<Currency>(editingAsset?.currency || 'MYR');
+  const [newCategory, setNewCategory] = useState('');
   const [exchangeRate, setExchangeRate] = useState<number | undefined>(editingAsset?.exchangeRate);
   const [loadingRate, setLoadingRate] = useState(false);
-  const [value, setValue] = useState(editingAsset?.value.toString() || '');
-  const getInitialDate = (): string => {
-    if (editingAsset) {
-      return editingAsset.date;
-    }
-    return new Date().toISOString().split('T')[0];
-  };
-  const [date, setDate] = useState<string>(getInitialDate());
-  const [errors, setErrors] = useState<Record<string, string>>({});
 
-  // Update form fields when editingAsset changes
+  const form = useForm<AssetFormValues>({
+    resolver: zodResolver(assetFormSchema),
+    defaultValues: {
+      name: editingAsset?.name || '',
+      assetType: editingAsset?.assetType || 'current',
+      category: editingAsset?.category || data.assetCategories[0] || '',
+      currency: (editingAsset?.currency ?? 'MYR') as 'MYR' | 'USD',
+      value: editingAsset?.value.toString() || '',
+      date: editingAsset?.date || new Date().toISOString().split('T')[0],
+    },
+  });
+
+  const watchedCurrency = form.watch('currency');
+
   useEffect(() => {
     if (editingAsset) {
-      setName(editingAsset.name || '');
-      setCategory(editingAsset.category || data.assetCategories[0] || '');
-      setAssetType(editingAsset.assetType || 'current');
-      setCurrency(editingAsset.currency || 'MYR');
+      form.reset({
+        name: editingAsset.name || '',
+        assetType: editingAsset.assetType || 'current',
+        category: editingAsset.category || data.assetCategories[0] || '',
+        currency: (editingAsset.currency ?? 'MYR') as 'MYR' | 'USD',
+        value: editingAsset.value.toString() || '',
+        date: editingAsset.date ?? new Date().toISOString().split('T')[0],
+      });
       setExchangeRate(editingAsset.exchangeRate);
-      setValue(editingAsset.value.toString() || '');
-      setDate(editingAsset.date ?? new Date().toISOString().split('T')[0]);
       setShowNewCategory(false);
       setNewCategory('');
     } else {
-      // Reset form when not editing
-      setName('');
-      setCategory(data.assetCategories[0] || '');
-      setAssetType('current');
-      setCurrency('MYR');
+      form.reset({
+        name: '',
+        assetType: 'current',
+        category: data.assetCategories[0] || '',
+        currency: 'MYR',
+        value: '',
+        date: new Date().toISOString().split('T')[0],
+      });
       setExchangeRate(undefined);
-      setValue('');
-      setDate(new Date().toISOString().split('T')[0]);
       setShowNewCategory(false);
       setNewCategory('');
     }
-    setErrors({});
-  }, [editingAsset, data.assetCategories]);
+  }, [editingAsset, data.assetCategories, form]);
 
-  // Fetch exchange rate when USD is selected
   useEffect(() => {
-    if (currency === 'USD' && !exchangeRate) {
+    if (watchedCurrency === 'USD' && !exchangeRate) {
       setLoadingRate(true);
       getUSDToMYRRate()
         .then(rate => {
           setExchangeRate(rate);
           setLoadingRate(false);
         })
-        .catch(error => {
-          console.error('Failed to fetch exchange rate:', error);
+        .catch(() => {
           setLoadingRate(false);
         });
-    } else if (currency === 'MYR') {
+    } else if (watchedCurrency === 'MYR') {
       setExchangeRate(undefined);
     }
-  }, [currency]);
+  }, [watchedCurrency]);
 
-  const validate = (): boolean => {
-    const newErrors: Record<string, string> = {};
-    
-    if (!name.trim()) {
-      newErrors.name = 'Asset name is required';
-    }
-    
-    // Validate category based on whether we're adding a new one
-    if (showNewCategory) {
-      if (!newCategory || !newCategory.trim()) {
-        newErrors.category = 'New category name is required';
-      }
-    } else {
-      if (!category || category === '__new__' || !category.trim()) {
-        newErrors.category = 'Category is required';
-      }
-    }
-    
-    if (!value || parseFloat(value) <= 0) {
-      newErrors.value = 'Value must be greater than 0';
-    }
-    
-    if (!date) {
-      newErrors.date = 'Date is required';
-    }
-    
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!validate()) {
+  const onSubmit = (values: AssetFormValues) => {
+    if (showNewCategory && !newCategory.trim()) {
       return;
     }
 
-    const finalCategory = showNewCategory && newCategory.trim() ? newCategory.trim() : category;
-    
-    // Add new category if it's a new one (must be done before using it)
+    const finalCategory = showNewCategory && newCategory.trim() ? newCategory.trim() : values.category;
+
     if (showNewCategory && newCategory.trim() && !data.assetCategories.includes(newCategory.trim())) {
       addAssetCategory(newCategory.trim());
     }
-    
-    const finalDate = date || new Date().toISOString().split('T')[0];
+
     const assetData: Omit<Asset, 'id'> = {
-      name: name.trim(),
+      name: values.name.trim(),
       category: finalCategory,
-      assetType,
-      value: parseFloat(value),
-      currency,
-      exchangeRate: currency === 'USD' ? exchangeRate : undefined,
-      date: finalDate,
+      assetType: values.assetType,
+      value: parseFloat(values.value),
+      currency: values.currency,
+      exchangeRate: values.currency === 'USD' ? exchangeRate : undefined,
+      date: values.date,
     };
 
     if (editingAsset) {
@@ -134,226 +117,180 @@ const AssetForm: React.FC<AssetFormProps> = ({ editingAsset, onCancel }) => {
       onCancel?.();
     } else {
       addAsset(assetData);
-      setName('');
-      setValue('');
-      setDate(new Date().toISOString().split('T')[0]);
-      // Select the newly added category or first category
-      if (showNewCategory && newCategory.trim()) {
-        setCategory(newCategory.trim());
-      } else {
-        setCategory(data.assetCategories[0] || '');
-      }
+      form.reset({
+        name: '',
+        assetType: 'current',
+        category: showNewCategory && newCategory.trim() ? newCategory.trim() : data.assetCategories[0] || '',
+        currency: 'MYR',
+        value: '',
+        date: new Date().toISOString().split('T')[0],
+      });
       setShowNewCategory(false);
       setNewCategory('');
     }
-    setErrors({});
   };
 
-  const handleCategoryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const selectedValue = e.target.value;
-    if (selectedValue === '__new__') {
+  const handleCategorySelectChange = (value: string) => {
+    if (value === '__new__') {
       setShowNewCategory(true);
-      setCategory('');
+      form.setValue('category', '');
       setNewCategory('');
-      // Clear category error when switching to new category mode
-      setErrors(prev => {
-        const newErrors = { ...prev };
-        delete newErrors.category;
-        return newErrors;
-      });
     } else {
       setShowNewCategory(false);
-      setCategory(selectedValue);
+      form.setValue('category', value);
       setNewCategory('');
-      // Clear category error when selecting existing category
-      setErrors(prev => {
-        const newErrors = { ...prev };
-        delete newErrors.category;
-        return newErrors;
-      });
     }
   };
 
   return (
-    <div className={styles.formCard}>
-      <h3 className={styles.formTitle}>{editingAsset ? 'Edit Asset' : 'Add Asset'}</h3>
-      <form onSubmit={handleSubmit} className={styles.form}>
-        <div className={styles.formGroup}>
-          <label htmlFor="asset-name" className={styles.label}>
-            Asset Name
-            <span className={styles.tooltip} title="Enter the name of your asset (e.g., Savings Account, Car, House)">
-              i
-            </span>
-          </label>
-          <input
-            id="asset-name"
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className={styles.input}
-            placeholder="e.g., Savings Account"
-          />
-          {errors.name && <span className={styles.error}>{errors.name}</span>}
-        </div>
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <FormField control={form.control} name="name" render={({ field }) => (
+              <FormItem>
+                <FormLabel title="Enter the name of your asset (e.g., Savings Account, Car, House)">
+                  Asset Name
+                </FormLabel>
+                <FormControl>
+                  <Input placeholder="e.g., Savings Account" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
 
-        <div className={styles.formGroup}>
-          <label htmlFor="asset-type" className={styles.label}>
-            Asset Type
-            <span className={styles.tooltip} title="Current assets are liquid (cash, accounts). Fixed assets are long-term (property, vehicles)">
-              i
-            </span>
-          </label>
-          <select
-            id="asset-type"
-            value={assetType}
-            onChange={(e) => setAssetType(e.target.value as 'current' | 'fixed')}
-            className={styles.select}
-          >
-            <option value="current">Current Asset</option>
-            <option value="fixed">Fixed Asset</option>
-          </select>
-        </div>
+            <FormField control={form.control} name="assetType" render={({ field }) => (
+              <FormItem>
+                <FormLabel title="Current assets are liquid (cash, accounts). Fixed assets are long-term (property, vehicles)">
+                  Asset Type
+                </FormLabel>
+                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select asset type" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="current">Current Asset</SelectItem>
+                    <SelectItem value="fixed">Fixed Asset</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )} />
 
-        <div className={styles.formGroup}>
-          <label htmlFor="asset-category" className={styles.label}>
-            Category
-            <span className={styles.tooltip} title="Select an existing category or add a new one">
-              i
-            </span>
-          </label>
-          {!showNewCategory ? (
-            <select
-              id="asset-category"
-              value={category}
-              onChange={handleCategoryChange}
-              className={styles.select}
-            >
-              {data.assetCategories.map(cat => (
-                <option key={cat} value={cat}>{cat}</option>
-              ))}
-              <option value="__new__">+ Add New Category</option>
-            </select>
-          ) : (
-            <div className={styles.newCategoryGroup}>
-              <input
-                type="text"
-                value={newCategory}
-                onChange={(e) => {
-                  setNewCategory(e.target.value);
-                  // Clear error when user starts typing
-                  if (errors.category) {
-                    setErrors(prev => {
-                      const newErrors = { ...prev };
-                      delete newErrors.category;
-                      return newErrors;
-                    });
-                  }
-                }}
-                className={`${styles.input} ${errors.category ? styles.inputError : ''}`}
-                placeholder="Enter new category name"
-                autoFocus
-              />
-              <button
-                type="button"
-                onClick={() => {
-                  setShowNewCategory(false);
-                  setNewCategory('');
-                  setCategory(data.assetCategories[0] || '');
-                  setErrors(prev => {
-                    const newErrors = { ...prev };
-                    delete newErrors.category;
-                    return newErrors;
-                  });
-                }}
-                className={styles.cancelButton}
-              >
-                Cancel
-              </button>
-            </div>
-          )}
-          {errors.category && <span className={styles.error}>{errors.category}</span>}
-        </div>
+            <FormField control={form.control} name="category" render={({ field }) => (
+              <FormItem>
+                <FormLabel title="Select an existing category or add a new one">
+                  Category
+                </FormLabel>
+                {!showNewCategory ? (
+                  <Select value={field.value} onValueChange={handleCategorySelectChange}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select category" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {data.assetCategories.map(cat => (
+                        <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                      ))}
+                      <SelectItem value="__new__">+ Add New Category</SelectItem>
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <FormControl>
+                    <div className="flex gap-2">
+                      <Input
+                        type="text"
+                        value={newCategory}
+                        onChange={(e) => setNewCategory(e.target.value)}
+                        placeholder="Enter new category name"
+                        autoFocus
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          setShowNewCategory(false);
+                          setNewCategory('');
+                          form.setValue('category', data.assetCategories[0] || '');
+                        }}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </FormControl>
+                )}
+                <FormMessage />
+              </FormItem>
+            )} />
 
-        <div className={styles.formGroup}>
-          <label htmlFor="asset-currency" className={styles.label}>
-            Currency
-            <span className={styles.tooltip} title="Select the currency for this asset">
-              i
-            </span>
-          </label>
-          <select
-            id="asset-currency"
-            value={currency}
-            onChange={(e) => setCurrency(e.target.value as Currency)}
-            className={styles.select}
-          >
-            <option value="MYR">MYR (Malaysian Ringgit)</option>
-            <option value="USD">USD (US Dollar)</option>
-          </select>
-          {currency === 'USD' && (
-            <div className={styles.exchangeRateInfo}>
-              {loadingRate ? (
-                <span className={styles.loadingText}>Loading exchange rate...</span>
-              ) : exchangeRate ? (
-                <span className={styles.rateText}>
-                  Rate: 1 USD = {exchangeRate.toFixed(4)} MYR
-                </span>
-              ) : (
-                <span className={styles.errorText}>Failed to load exchange rate</span>
+            <FormField control={form.control} name="currency" render={({ field }) => (
+              <FormItem>
+                <FormLabel title="Select the currency for this asset">
+                  Currency
+                </FormLabel>
+                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select currency" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="MYR">MYR (Malaysian Ringgit)</SelectItem>
+                    <SelectItem value="USD">USD (US Dollar)</SelectItem>
+                  </SelectContent>
+                </Select>
+                {watchedCurrency === 'USD' && (
+                  <FormDescription>
+                    {loadingRate ? (
+                      <span>Loading exchange rate...</span>
+                    ) : exchangeRate ? (
+                      <span>Rate: 1 USD = {exchangeRate.toFixed(4)} MYR</span>
+                    ) : (
+                      <span className="text-destructive">Failed to load exchange rate</span>
+                    )}
+                  </FormDescription>
+                )}
+                <FormMessage />
+              </FormItem>
+            )} />
+
+            <FormField control={form.control} name="value" render={({ field }) => (
+              <FormItem>
+                <FormLabel title="Enter the current value of the asset">
+                  Value ({watchedCurrency === 'MYR' ? 'MYR' : 'USD'})
+                </FormLabel>
+                <FormControl>
+                  <Input type="number" step="0.01" min="0" placeholder="0.00" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+
+            <FormField control={form.control} name="date" render={({ field }) => (
+              <FormItem>
+                <FormLabel title="Select the date when this asset value was recorded">
+                  Date
+                </FormLabel>
+                <FormControl>
+                  <Input type="date" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+
+            <div className="flex gap-3 pt-2">
+              <Button type="submit">
+                {editingAsset ? 'Update Asset' : 'Add Asset'}
+              </Button>
+              {editingAsset && onCancel && (
+                <Button type="button" variant="outline" onClick={onCancel}>
+                  Cancel
+                </Button>
               )}
             </div>
-          )}
-        </div>
-
-        <div className={styles.formGroup}>
-          <label htmlFor="asset-value" className={styles.label}>
-            Value ({currency === 'MYR' ? 'MYR' : 'USD'})
-            <span className={styles.tooltip} title="Enter the current value of the asset">
-              i
-            </span>
-          </label>
-          <input
-            id="asset-value"
-            type="number"
-            step="0.01"
-            min="0"
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            className={styles.input}
-            placeholder="0.00"
-          />
-          {errors.value && <span className={styles.error}>{errors.value}</span>}
-        </div>
-
-        <div className={styles.formGroup}>
-          <label htmlFor="asset-date" className={styles.label}>
-            Date
-            <span className={styles.tooltip} title="Select the date when this asset value was recorded">
-              i
-            </span>
-          </label>
-          <input
-            id="asset-date"
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            className={styles.input}
-          />
-          {errors.date && <span className={styles.error}>{errors.date}</span>}
-        </div>
-
-        <div className={styles.formActions}>
-          <button type="submit" className={styles.submitButton}>
-            {editingAsset ? 'Update Asset' : 'Add Asset'}
-          </button>
-          {editingAsset && onCancel && (
-            <button type="button" onClick={onCancel} className={styles.cancelButton}>
-              Cancel
-            </button>
-          )}
-        </div>
       </form>
-    </div>
+    </Form>
   );
 };
 

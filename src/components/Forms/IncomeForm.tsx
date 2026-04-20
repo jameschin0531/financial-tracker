@@ -1,8 +1,14 @@
 import React, { useState, useEffect } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { useFinancialData } from '../../context/FinancialDataContext';
 import type { Income, Currency } from '../../types/financial';
 import { getUSDToMYRRate } from '../../services/exchangeRateService';
-import styles from './Forms.module.css';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Form, FormField, FormItem, FormLabel, FormControl, FormDescription, FormMessage } from '@/components/ui/form';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const INCOME_FREQUENCIES: Array<{ value: 'weekly' | 'bi-weekly' | 'monthly' | 'yearly' | 'one-time'; label: string }> = [
   { value: 'weekly', label: 'Weekly' },
@@ -12,11 +18,6 @@ const INCOME_FREQUENCIES: Array<{ value: 'weekly' | 'bi-weekly' | 'monthly' | 'y
   { value: 'one-time', label: 'One-time' },
 ];
 
-interface IncomeFormProps {
-  editingIncome?: Income;
-  onCancel?: () => void;
-}
-
 export const preventNumberInputScroll = (event: React.WheelEvent<HTMLInputElement>): void => {
   if (event.currentTarget.type !== 'number') {
     return;
@@ -25,97 +26,85 @@ export const preventNumberInputScroll = (event: React.WheelEvent<HTMLInputElemen
   event.currentTarget.blur();
 };
 
+const incomeFormSchema = z.object({
+  source: z.string().min(1, 'Income source is required'),
+  currency: z.enum(['MYR', 'USD']),
+  amount: z.string().min(1, 'Amount is required').refine(v => !isNaN(parseFloat(v)) && parseFloat(v) > 0, 'Amount must be greater than 0'),
+  frequency: z.enum(['weekly', 'bi-weekly', 'monthly', 'yearly', 'one-time']),
+  date: z.string().min(1, 'Date is required'),
+});
+
+type IncomeFormValues = z.infer<typeof incomeFormSchema>;
+
+interface IncomeFormProps {
+  editingIncome?: Income;
+  onCancel?: () => void;
+}
+
 const IncomeForm: React.FC<IncomeFormProps> = ({ editingIncome, onCancel }) => {
   const { addIncome, updateIncome } = useFinancialData();
-  const [source, setSource] = useState(editingIncome?.source || '');
-  const [currency, setCurrency] = useState<Currency>(editingIncome?.currency || 'MYR');
   const [exchangeRate, setExchangeRate] = useState<number | undefined>(editingIncome?.exchangeRate);
   const [loadingRate, setLoadingRate] = useState(false);
-  const [amount, setAmount] = useState(editingIncome?.amount.toString() || '');
-  const [frequency, setFrequency] = useState<'weekly' | 'bi-weekly' | 'monthly' | 'yearly' | 'one-time'>(
-    editingIncome?.frequency || 'monthly'
-  );
-  const getInitialDate = (): string => {
-    if (editingIncome) {
-      return editingIncome.date;
-    }
-    return new Date().toISOString().split('T')[0];
-  };
-  const [date, setDate] = useState<string>(getInitialDate());
-  const [errors, setErrors] = useState<Record<string, string>>({});
 
-  // Update form fields when editingIncome changes
+  const form = useForm<IncomeFormValues>({
+    resolver: zodResolver(incomeFormSchema),
+    defaultValues: {
+      source: editingIncome?.source || '',
+      currency: (editingIncome?.currency ?? 'MYR') as 'MYR' | 'USD',
+      amount: editingIncome?.amount.toString() || '',
+      frequency: editingIncome?.frequency || 'monthly',
+      date: editingIncome?.date || new Date().toISOString().split('T')[0],
+    },
+  });
+
+  const watchedCurrency = form.watch('currency');
+
   useEffect(() => {
     if (editingIncome) {
-      setSource(editingIncome.source || '');
-      setCurrency(editingIncome.currency || 'MYR');
+      form.reset({
+        source: editingIncome.source || '',
+        currency: (editingIncome.currency ?? 'MYR') as 'MYR' | 'USD',
+        amount: editingIncome.amount.toString() || '',
+        frequency: editingIncome.frequency || 'monthly',
+        date: editingIncome.date || new Date().toISOString().split('T')[0],
+      });
       setExchangeRate(editingIncome.exchangeRate);
-      setAmount(editingIncome.amount.toString() || '');
-      setFrequency(editingIncome.frequency || 'monthly');
-      setDate(editingIncome.date || new Date().toISOString().split('T')[0]);
     } else {
-      // Reset form when not editing
-      setSource('');
-      setCurrency('MYR');
+      form.reset({
+        source: '',
+        currency: 'MYR',
+        amount: '',
+        frequency: 'monthly',
+        date: new Date().toISOString().split('T')[0],
+      });
       setExchangeRate(undefined);
-      setAmount('');
-      setFrequency('monthly');
-      setDate(new Date().toISOString().split('T')[0]);
     }
-    setErrors({});
-  }, [editingIncome]);
+  }, [editingIncome, form]);
 
-  // Fetch exchange rate when USD is selected
   useEffect(() => {
-    if (currency === 'USD' && !exchangeRate) {
+    if (watchedCurrency === 'USD' && !exchangeRate) {
       setLoadingRate(true);
       getUSDToMYRRate()
         .then(rate => {
           setExchangeRate(rate);
           setLoadingRate(false);
         })
-        .catch(error => {
-          console.error('Failed to fetch exchange rate:', error);
+        .catch(() => {
           setLoadingRate(false);
         });
-    } else if (currency === 'MYR') {
+    } else if (watchedCurrency === 'MYR') {
       setExchangeRate(undefined);
     }
-  }, [currency]);
+  }, [watchedCurrency]);
 
-  const validate = (): boolean => {
-    const newErrors: Record<string, string> = {};
-    
-    if (!source.trim()) {
-      newErrors.source = 'Income source is required';
-    }
-    
-    if (!amount || parseFloat(amount) <= 0) {
-      newErrors.amount = 'Amount must be greater than 0';
-    }
-    
-    if (!date) {
-      newErrors.date = 'Date is required';
-    }
-    
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!validate()) {
-      return;
-    }
-    
+  const onSubmit = (values: IncomeFormValues) => {
     const incomeData: Omit<Income, 'id'> = {
-      source: source.trim(),
-      amount: parseFloat(amount),
-      currency,
-      exchangeRate: currency === 'USD' ? exchangeRate : undefined,
-      frequency,
-      date: date || new Date().toISOString().split('T')[0],
+      source: values.source.trim(),
+      amount: parseFloat(values.amount),
+      currency: values.currency,
+      exchangeRate: values.currency === 'USD' ? exchangeRate : undefined,
+      frequency: values.frequency,
+      date: values.date,
     };
 
     if (editingIncome) {
@@ -123,138 +112,127 @@ const IncomeForm: React.FC<IncomeFormProps> = ({ editingIncome, onCancel }) => {
       onCancel?.();
     } else {
       addIncome(incomeData);
-      setSource('');
-      setAmount('');
-      setFrequency('monthly');
-      setDate(new Date().toISOString().split('T')[0]);
+      form.reset({
+        source: '',
+        currency: 'MYR',
+        amount: '',
+        frequency: 'monthly',
+        date: new Date().toISOString().split('T')[0],
+      });
     }
-    setErrors({});
   };
 
   return (
-    <div className={styles.formCard}>
-      <h3 className={styles.formTitle}>{editingIncome ? 'Edit Income' : 'Add Income'}</h3>
-      <form onSubmit={handleSubmit} className={styles.form}>
-        <div className={styles.formGroup}>
-          <label htmlFor="income-source" className={styles.label}>
-            Income Source
-            <span className={styles.tooltip} title="Enter the source of your income (e.g., Salary, Freelance, Investment)">
-              i
-            </span>
-          </label>
-          <input
-            id="income-source"
-            type="text"
-            value={source}
-            onChange={(e) => setSource(e.target.value)}
-            className={styles.input}
-            placeholder="e.g., Salary"
-          />
-          {errors.source && <span className={styles.error}>{errors.source}</span>}
-        </div>
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <FormField control={form.control} name="source" render={({ field }) => (
+              <FormItem>
+                <FormLabel title="Enter the source of your income (e.g., Salary, Freelance, Investment)">
+                  Income Source
+                </FormLabel>
+                <FormControl>
+                  <Input placeholder="e.g., Salary" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
 
-        <div className={styles.formGroup}>
-          <label htmlFor="income-currency" className={styles.label}>
-            Currency
-            <span className={styles.tooltip} title="Select the currency for this income">
-              i
-            </span>
-          </label>
-          <select
-            id="income-currency"
-            value={currency}
-            onChange={(e) => setCurrency(e.target.value as Currency)}
-            className={styles.select}
-          >
-            <option value="MYR">MYR (Malaysian Ringgit)</option>
-            <option value="USD">USD (US Dollar)</option>
-          </select>
-          {currency === 'USD' && (
-            <div className={styles.exchangeRateInfo}>
-              {loadingRate ? (
-                <span className={styles.loadingText}>Loading exchange rate...</span>
-              ) : exchangeRate ? (
-                <span className={styles.rateText}>
-                  Rate: 1 USD = {exchangeRate.toFixed(4)} MYR
-                </span>
-              ) : (
-                <span className={styles.errorText}>Failed to load exchange rate</span>
+            <FormField control={form.control} name="currency" render={({ field }) => (
+              <FormItem>
+                <FormLabel title="Select the currency for this income">
+                  Currency
+                </FormLabel>
+                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select currency" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="MYR">MYR (Malaysian Ringgit)</SelectItem>
+                    <SelectItem value="USD">USD (US Dollar)</SelectItem>
+                  </SelectContent>
+                </Select>
+                {watchedCurrency === 'USD' && (
+                  <FormDescription>
+                    {loadingRate ? (
+                      <span>Loading exchange rate...</span>
+                    ) : exchangeRate ? (
+                      <span>Rate: 1 USD = {exchangeRate.toFixed(4)} MYR</span>
+                    ) : (
+                      <span className="text-destructive">Failed to load exchange rate</span>
+                    )}
+                  </FormDescription>
+                )}
+                <FormMessage />
+              </FormItem>
+            )} />
+
+            <FormField control={form.control} name="amount" render={({ field }) => (
+              <FormItem>
+                <FormLabel title="Enter the income amount based on the frequency selected">
+                  Amount ({watchedCurrency === 'MYR' ? 'MYR' : 'USD'})
+                </FormLabel>
+                <FormControl>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="0.00"
+                    onWheel={preventNumberInputScroll}
+                    {...field}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+
+            <FormField control={form.control} name="frequency" render={({ field }) => (
+              <FormItem>
+                <FormLabel title="Select how often you receive this income">
+                  Frequency
+                </FormLabel>
+                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select frequency" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {INCOME_FREQUENCIES.map(freq => (
+                      <SelectItem key={freq.value} value={freq.value}>{freq.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )} />
+
+            <FormField control={form.control} name="date" render={({ field }) => (
+              <FormItem>
+                <FormLabel title="Select the date when this income was received or starts">
+                  Date
+                </FormLabel>
+                <FormControl>
+                  <Input type="date" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+
+            <div className="flex gap-3 pt-2">
+              <Button type="submit">
+                {editingIncome ? 'Update Income' : 'Add Income'}
+              </Button>
+              {editingIncome && onCancel && (
+                <Button type="button" variant="outline" onClick={onCancel}>
+                  Cancel
+                </Button>
               )}
             </div>
-          )}
-        </div>
-
-        <div className={styles.formGroup}>
-          <label htmlFor="income-amount" className={styles.label}>
-            Amount ({currency === 'MYR' ? 'MYR' : 'USD'})
-            <span className={styles.tooltip} title="Enter the income amount based on the frequency selected">
-              i
-            </span>
-          </label>
-          <input
-            id="income-amount"
-            type="number"
-            step="0.01"
-            min="0"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            onWheel={preventNumberInputScroll}
-            className={styles.input}
-            placeholder="0.00"
-          />
-          {errors.amount && <span className={styles.error}>{errors.amount}</span>}
-        </div>
-
-        <div className={styles.formGroup}>
-          <label htmlFor="income-frequency" className={styles.label}>
-            Frequency
-            <span className={styles.tooltip} title="Select how often you receive this income">
-              i
-            </span>
-          </label>
-          <select
-            id="income-frequency"
-            value={frequency}
-            onChange={(e) => setFrequency(e.target.value as typeof frequency)}
-            className={styles.select}
-          >
-            {INCOME_FREQUENCIES.map(freq => (
-              <option key={freq.value} value={freq.value}>{freq.label}</option>
-            ))}
-          </select>
-        </div>
-
-        <div className={styles.formGroup}>
-          <label htmlFor="income-date" className={styles.label}>
-            Date
-            <span className={styles.tooltip} title="Select the date when this income was received or starts">
-              i
-            </span>
-          </label>
-          <input
-            id="income-date"
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            className={styles.input}
-          />
-          {errors.date && <span className={styles.error}>{errors.date}</span>}
-        </div>
-
-        <div className={styles.formActions}>
-          <button type="submit" className={styles.submitButton}>
-            {editingIncome ? 'Update Income' : 'Add Income'}
-          </button>
-          {editingIncome && onCancel && (
-            <button type="button" onClick={onCancel} className={styles.cancelButton}>
-              Cancel
-            </button>
-          )}
-        </div>
       </form>
-    </div>
+    </Form>
   );
 };
 
 export default IncomeForm;
-

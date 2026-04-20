@@ -1,9 +1,25 @@
 import React, { useState, useEffect } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { useFinancialData } from '../../context/FinancialDataContext';
 import type { CryptoHolding } from '../../types/financial';
 import { getCryptoPrice } from '../../services/cryptoPriceService';
 import { getUSDToMYRRate } from '../../services/exchangeRateService';
-import styles from '../Stocks/Stocks.module.css';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
+const cryptoHoldingFormSchema = z.object({
+  symbol: z.string().min(1, 'Crypto symbol is required'),
+  name: z.string().optional().or(z.literal('')),
+  quantity: z.string().min(1, 'Quantity is required').refine(v => !isNaN(parseFloat(v)) && parseFloat(v) > 0, 'Quantity must be greater than 0'),
+  avgPrice: z.string().min(1, 'Average price is required').refine(v => !isNaN(parseFloat(v)) && parseFloat(v) > 0, 'Average price must be greater than 0'),
+  account: z.string().min(1, 'Account is required'),
+});
+
+type CryptoHoldingFormValues = z.infer<typeof cryptoHoldingFormSchema>;
 
 interface CryptoHoldingFormProps {
   holding?: CryptoHolding;
@@ -13,279 +29,201 @@ interface CryptoHoldingFormProps {
 
 const CryptoHoldingForm: React.FC<CryptoHoldingFormProps> = ({ holding, onCancel, accounts }) => {
   const { data, addCryptoHolding, updateCryptoHolding } = useFinancialData();
-  const [symbol, setSymbol] = useState(holding?.symbol || '');
-  const [name, setName] = useState(holding?.name || '');
-  const [quantity, setQuantity] = useState(holding?.quantity ? holding.quantity.toString() : '');
-  const [avgPrice, setAvgPrice] = useState(holding?.avgPrice ? holding.avgPrice.toString() : '');
-  const [account, setAccount] = useState(holding?.account || (accounts.length > 0 && accounts[0] ? accounts[0].name : ''));
-  
-  // Update account when accounts change
-  useEffect(() => {
-    if (!holding && accounts.length > 0 && accounts[0] && !account) {
-      setAccount(accounts[0].name);
-    }
-  }, [accounts, holding, account]);
   const [loadingPrice, setLoadingPrice] = useState(false);
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  
-  // Clear errors when user types
-  useEffect(() => {
-    if (errors.avgPrice && avgPrice) {
-      setErrors(prev => {
-        const newErrors = { ...prev };
-        delete newErrors.avgPrice;
-        return newErrors;
-      });
-    }
-  }, [avgPrice, errors.avgPrice]);
 
-  // Auto-fetch price when symbol changes
+  const form = useForm<CryptoHoldingFormValues>({
+    resolver: zodResolver(cryptoHoldingFormSchema),
+    defaultValues: {
+      symbol: holding?.symbol || '',
+      name: holding?.name || '',
+      quantity: holding?.quantity ? holding.quantity.toString() : '',
+      avgPrice: holding?.avgPrice ? holding.avgPrice.toString() : '',
+      account: holding?.account || (accounts.length > 0 && accounts[0] ? accounts[0].name : ''),
+    },
+  });
+
+  const watchedSymbol = form.watch('symbol');
+
   useEffect(() => {
-    if (symbol && symbol.length >= 2 && !holding) {
+    if (!holding && accounts.length > 0 && accounts[0]) {
+      const currentAccount = form.getValues('account');
+      if (!currentAccount) {
+        form.setValue('account', accounts[0].name);
+      }
+    }
+  }, [accounts, holding, form]);
+
+  useEffect(() => {
+    if (watchedSymbol && watchedSymbol.length >= 2 && !holding) {
       const timer = setTimeout(async () => {
         setLoadingPrice(true);
         try {
-          const price = await getCryptoPrice(symbol);
-          if (price) {
-            // Price will be set when form is submitted
-          }
-        } catch (error) {
-          console.error('Error fetching price:', error);
+          await getCryptoPrice(watchedSymbol);
+        } catch {
+          // Price fetch is best-effort
         } finally {
           setLoadingPrice(false);
         }
-      }, 1000); // Debounce
-      
+      }, 1000);
+
       return () => clearTimeout(timer);
     }
-  }, [symbol, holding]);
+  }, [watchedSymbol, holding]);
 
-  const validate = (): boolean => {
-    const newErrors: Record<string, string> = {};
-    
-    if (!symbol.trim()) {
-      newErrors.symbol = 'Crypto symbol is required';
-    }
-    
-    const quantityNum = parseFloat(quantity);
-    if (!quantity || isNaN(quantityNum) || quantityNum <= 0) {
-      newErrors.quantity = 'Quantity must be greater than 0';
-    }
-    
-    const avgPriceNum = parseFloat(avgPrice);
-    if (!avgPrice || avgPrice.trim() === '' || isNaN(avgPriceNum) || avgPriceNum <= 0) {
-      newErrors.avgPrice = 'Average price must be greater than 0';
-    }
-    
-    if (!account || account.trim() === '') {
-      newErrors.account = 'Account is required';
-    }
-    
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!validate()) {
-      return;
-    }
-
-    // Fetch current price and exchange rate
+  const onSubmit = async (values: CryptoHoldingFormValues) => {
     let marketPrice = holding?.marketPrice;
     let exchangeRate = holding?.exchangeRate;
-    
-    
+
     if (!marketPrice || !holding) {
       setLoadingPrice(true);
       try {
-        const price = await getCryptoPrice(symbol.toUpperCase());
+        const price = await getCryptoPrice(values.symbol.toUpperCase());
         if (price) {
           marketPrice = price;
         }
-      } catch (error) {
-        console.error('Error fetching price:', error);
+      } catch {
+        // Price fetch is best-effort
       }
       setLoadingPrice(false);
     }
-    
-    // Crypto prices are always in USD, so always fetch USD to MYR rate
+
     if (!exchangeRate) {
       exchangeRate = await getUSDToMYRRate();
     }
 
     const holdingData: Omit<CryptoHolding, 'id'> = {
-      symbol: symbol.toUpperCase().trim(),
-      name: name.trim() || undefined,
-      quantity: parseFloat(quantity),
-      avgPrice: parseFloat(avgPrice),
+      symbol: values.symbol.toUpperCase().trim(),
+      name: values.name?.trim() || undefined,
+      quantity: parseFloat(values.quantity),
+      avgPrice: parseFloat(values.avgPrice),
       marketPrice,
-      account,
-      currency: 'USD', // Crypto prices are always in USD
+      account: values.account,
+      currency: 'USD',
       exchangeRate: exchangeRate || 4.7,
       lastUpdated: marketPrice ? new Date().toISOString() : undefined,
     };
-    
 
     if (holding) {
       updateCryptoHolding(holding.id, holdingData);
       onCancel();
     } else {
       addCryptoHolding(holdingData);
-      setSymbol('');
-      setName('');
-      setQuantity('');
-      setAvgPrice('');
-      setAccount(accounts[0]?.name || '');
-      setErrors({});
+      form.reset({
+        symbol: '',
+        name: '',
+        quantity: '',
+        avgPrice: '',
+        account: accounts[0]?.name || '',
+      });
       onCancel();
     }
   };
 
   return (
-    <div className={styles.formCard}>
-      <h3 className={styles.formTitle}>{holding ? 'Edit Crypto Holding' : 'Add Crypto Holding'}</h3>
-      <form onSubmit={handleSubmit} className={styles.form}>
-        <div className={styles.formRow}>
-          <div className={styles.formGroup}>
-            <label htmlFor="crypto-symbol" className={styles.label}>
-              Crypto Symbol
-              <span className={styles.tooltip} title="Enter the crypto symbol (e.g., BTC, ETH, SOL)">
-                i
-              </span>
-            </label>
-            <input
-              id="crypto-symbol"
-              type="text"
-              value={symbol}
-              onChange={(e) => {
-                const target = e.target as HTMLInputElement;
-                setSymbol(target.value.toUpperCase());
-              }}
-              className={styles.input}
-              placeholder="e.g., BTC"
-            />
-            {errors.symbol && <span className={styles.error}>{errors.symbol}</span>}
-          </div>
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <FormField control={form.control} name="symbol" render={({ field }) => (
+                <FormItem>
+                  <FormLabel title="Enter the crypto symbol (e.g., BTC, ETH, SOL)">
+                    Crypto Symbol
+                  </FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="e.g., BTC"
+                      {...field}
+                      onChange={(e) => field.onChange(e.target.value.toUpperCase())}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
 
-          <div className={styles.formGroup}>
-            <label htmlFor="crypto-name" className={styles.label}>
-              Crypto Name (Optional)
-            </label>
-            <input
-              id="crypto-name"
-              type="text"
-              value={name}
-              onChange={(e) => {
-                const target = e.target as HTMLInputElement;
-                setName(target.value);
-              }}
-              className={styles.input}
-              placeholder="e.g., Bitcoin"
-            />
-          </div>
-        </div>
+              <FormField control={form.control} name="name" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Crypto Name (Optional)</FormLabel>
+                  <FormControl>
+                    <Input placeholder="e.g., Bitcoin" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+            </div>
 
-        <div className={styles.formRow}>
-          <div className={styles.formGroup}>
-            <label htmlFor="crypto-quantity" className={styles.label}>
-              Quantity
-            </label>
-            <input
-              id="crypto-quantity"
-              type="number"
-              step="0.00000001"
-              min="0"
-              value={quantity}
-              onChange={(e) => {
-                const target = e.target as HTMLInputElement;
-                setQuantity(target.value);
-              }}
-              className={styles.input}
-              placeholder="0.00000000"
-            />
-            {errors.quantity && <span className={styles.error}>{errors.quantity}</span>}
-          </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <FormField control={form.control} name="quantity" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Quantity</FormLabel>
+                  <FormControl>
+                    <Input type="number" step="0.00000001" min="0" placeholder="0.00000000" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
 
-          <div className={styles.formGroup}>
-            <label htmlFor="crypto-avg-price" className={styles.label}>
-              Average Price (USD)
-            </label>
-            <input
-              id="crypto-avg-price"
-              type="number"
-              step="0.01"
-              min="0"
-              value={avgPrice}
-              onChange={(e) => {
-                const target = e.target as HTMLInputElement;
-                setAvgPrice(target.value);
-              }}
-              className={styles.input}
-              placeholder="0.00"
-            />
-            {errors.avgPrice && <span className={styles.error}>{errors.avgPrice}</span>}
-          </div>
-        </div>
+              <FormField control={form.control} name="avgPrice" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Average Price (USD)</FormLabel>
+                  <FormControl>
+                    <Input type="number" step="0.01" min="0" placeholder="0.00" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+            </div>
 
-        <div className={styles.formRow}>
-          <div className={styles.formGroup}>
-            <label htmlFor="crypto-account" className={styles.label}>
-              Account/Wallet
-            </label>
-            {accounts.length === 0 ? (
-              <div className={styles.error}>
-                No crypto accounts available. Please add an account first.
-              </div>
-            ) : (
-              <>
-                <select
-                  id="crypto-account"
-                  value={account}
-                  onChange={(e) => {
-                    const target = e.target as HTMLSelectElement;
-                    setAccount(target.value);
-                  }}
-                  className={styles.select}
-                >
-                  {accounts.map(acc => (
-                    <option key={acc.id} value={acc.name}>{acc.name}</option>
-                  ))}
-                </select>
-                {errors.account && <span className={styles.error}>{errors.account}</span>}
-              </>
+            <FormField control={form.control} name="account" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Account/Wallet</FormLabel>
+                {accounts.length === 0 ? (
+                  <p className="text-sm text-destructive">
+                    No crypto accounts available. Please add an account first.
+                  </p>
+                ) : (
+                  <>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select account" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {accounts.map(acc => (
+                          <SelectItem key={acc.id} value={acc.name}>{acc.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </>
+                )}
+              </FormItem>
+            )} />
+
+            {loadingPrice && (
+              <p className="text-sm text-muted-foreground">
+                Fetching current market price...
+              </p>
             )}
-          </div>
-        </div>
 
-        {loadingPrice && (
-          <div className={styles.loadingMessage}>
-            Fetching current market price...
-          </div>
-        )}
-
-        <div className={styles.formActions}>
-          <button 
-            type="submit" 
-            className={styles.submitButton} 
-            disabled={loadingPrice}
-          >
-            {holding ? 'Update Holding' : 'Add Holding'}
-          </button>
-          <button type="button" onClick={onCancel} className={styles.cancelButton}>
-            Cancel
-          </button>
-        </div>
-        {accounts.length === 0 && (
-          <div className={styles.error} style={{ marginTop: '0.5rem', textAlign: 'center', width: '100%' }}>
-            Please add a crypto account first before adding holdings.
-          </div>
-        )}
+            <div className="flex gap-3 pt-2">
+              <Button
+                type="submit"
+                disabled={loadingPrice}
+              >
+                {holding ? 'Update Holding' : 'Add Holding'}
+              </Button>
+              <Button type="button" variant="outline" onClick={onCancel}>
+                Cancel
+              </Button>
+            </div>
+            {accounts.length === 0 && (
+              <p className="text-sm text-destructive text-center">
+                Please add a crypto account first before adding holdings.
+              </p>
+            )}
       </form>
-    </div>
+    </Form>
   );
 };
 
 export default CryptoHoldingForm;
-

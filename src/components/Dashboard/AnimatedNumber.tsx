@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 interface AnimatedNumberProps {
   value: number;
@@ -6,11 +6,11 @@ interface AnimatedNumberProps {
   formatFn?: (n: number) => string;
 }
 
-const AnimatedNumber: React.FC<AnimatedNumberProps> = ({
+const AnimatedNumber = ({
   value,
   duration = 800,
   formatFn = (n) => n.toLocaleString(),
-}) => {
+}: AnimatedNumberProps) => {
   const [displayValue, setDisplayValue] = useState(0);
   const prevValue = useRef(0);
   const rafId = useRef<number>(0);

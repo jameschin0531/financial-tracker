@@ -1,6 +1,7 @@
-import React, { useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { useFinancialData } from '../context/FinancialDataContext';
 import { useToast } from '../context/ToastContext';
+import { cn } from '@/lib/utils';
 import type { Income, Expense } from '../types/financial';
 import IncomeForm from '../components/Forms/IncomeForm';
 import ExpenseForm from '../components/Forms/ExpenseForm';
@@ -11,8 +12,16 @@ import {
   calculateCashFlow,
 } from '../services/calculations';
 import { formatCurrency } from '../utils/formatters';
-import styles from './Pages.module.css';
-import cashFlowStyles from './CashFlow.module.css';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+} from '@/components/ui/table';
 
 export interface CashFlowTableItem {
   id: string;
@@ -138,120 +147,124 @@ const CashFlowPage: React.FC = () => {
   };
 
   return (
-    <div className={styles.page}>
-      <div className={styles.pageHeader}>
-        <h1 className={styles.pageTitle}>Monthly Cash Flow</h1>
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <h1 className="text-2xl font-bold tracking-tight">Monthly Cash Flow</h1>
       </div>
 
-      <div className={styles.pageContent}>
-        <div className={cashFlowStyles.tableSection}>
-          <div className={cashFlowStyles.tableContainer}>
-            <table className={cashFlowStyles.cashFlowTable}>
-              <thead>
-                <tr>
-                  <th className={cashFlowStyles.colNo}>No</th>
-                  <th className={cashFlowStyles.colItem}>Item</th>
-                  <th className={cashFlowStyles.colRemark}>Remark</th>
-                  <th className={cashFlowStyles.colIncome}>Income</th>
-                  <th className={cashFlowStyles.colExpense}>Expenses</th>
-                  <th className={cashFlowStyles.colActions}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {tableItems.map((item, index) => (
-                  <tr key={item.rowKey}>
-                    <td className={cashFlowStyles.colNo}>{index + 1}</td>
-                    <td className={cashFlowStyles.colItem}>
-                      <strong>{item.item}</strong>
-                    </td>
-                    <td className={cashFlowStyles.colRemark}>{item.remark}</td>
-                    <td className={cashFlowStyles.colIncome}>
-                      {item.income > 0 ? formatCurrency(item.income, 'MYR') : ''}
-                    </td>
-                    <td className={cashFlowStyles.colExpense}>
-                      {item.expense > 0 ? formatCurrency(item.expense, 'MYR') : ''}
-                    </td>
-                    <td className={cashFlowStyles.colActions}>
-                      <div className={cashFlowStyles.actionButtons}>
-                        <button
-                          className={cashFlowStyles.editButton}
-                          onClick={() => {
-                            if (item.type === 'income') {
-                              setEditingIncome(item.originalItem as Income);
-                            } else {
-                              setEditingExpense(item.originalItem as Expense);
-                            }
-                          }}
-                          title="Edit"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          className={cashFlowStyles.deleteButton}
-                          onClick={() => setDeleteTarget(item)}
-                          title="Delete"
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-                <tr className={cashFlowStyles.summaryRow}>
-                  <td className={cashFlowStyles.colNo}></td>
-                  <td className={cashFlowStyles.colItem}><strong>INCOME</strong></td>
-                  <td className={cashFlowStyles.colRemark}></td>
-                  <td className={cashFlowStyles.colIncome}>
-                    <strong>{formatCurrency(monthlyIncome, 'MYR')}</strong>
-                  </td>
-                  <td className={cashFlowStyles.colExpense}></td>
-                  <td className={cashFlowStyles.colActions}></td>
-                </tr>
-                <tr className={cashFlowStyles.summaryRow}>
-                  <td className={cashFlowStyles.colNo}></td>
-                  <td className={cashFlowStyles.colItem}><strong>EXPENSE</strong></td>
-                  <td className={cashFlowStyles.colRemark}></td>
-                  <td className={cashFlowStyles.colIncome}></td>
-                  <td className={cashFlowStyles.colExpense}>
-                    <strong>{formatCurrency(monthlyExpenses, 'MYR')}</strong>
-                  </td>
-                  <td className={cashFlowStyles.colActions}></td>
-                </tr>
-                <tr className={`${cashFlowStyles.summaryRow} ${cashFlowStyles.balanceRow}`}>
-                  <td className={cashFlowStyles.colNo}></td>
-                  <td className={cashFlowStyles.colItem}><strong>BALANCE</strong></td>
-                  <td className={cashFlowStyles.colRemark}></td>
-                  <td className={cashFlowStyles.colIncome} colSpan={2}>
-                    <strong>{formatCurrency(cashFlow, 'MYR')}</strong>
-                  </td>
-                  <td className={cashFlowStyles.colActions}></td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Income</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-emerald-500">{formatCurrency(monthlyIncome, 'MYR')}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Expense</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-red-500">{formatCurrency(monthlyExpenses, 'MYR')}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Balance</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className={cn('text-2xl font-bold', cashFlow >= 0 ? 'text-emerald-500' : 'text-red-500')}>
+              {formatCurrency(cashFlow, 'MYR')}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
-        <div className={styles.contentGrid}>
-          <div className={styles.formSection}>
-            <h2 className={styles.sectionTitle}>
+      <Card>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-12">No</TableHead>
+                <TableHead>Item</TableHead>
+                <TableHead>Remark</TableHead>
+                <TableHead className="text-right">Income</TableHead>
+                <TableHead className="text-right">Expenses</TableHead>
+                <TableHead className="w-28">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {tableItems.map((item, index) => (
+                <TableRow key={item.rowKey}>
+                  <TableCell>{index + 1}</TableCell>
+                  <TableCell className="font-medium">{item.item}</TableCell>
+                  <TableCell>{item.remark}</TableCell>
+                  <TableCell className="text-right">
+                    {item.income > 0 ? formatCurrency(item.income, 'MYR') : ''}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {item.expense > 0 ? formatCurrency(item.expense, 'MYR') : ''}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex gap-1">
+                      <Button
+                        variant="outline"
+                        size="xs"
+                        onClick={() => {
+                          if (item.type === 'income') {
+                            setEditingIncome(item.originalItem as Income);
+                          } else {
+                            setEditingExpense(item.originalItem as Expense);
+                          }
+                        }}
+                      >
+                        Edit
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        size="xs"
+                        onClick={() => setDeleteTarget(item)}
+                      >
+                        Delete
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>
               {editingIncome ? 'Edit Income' : 'Add Income'}
-            </h2>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
             <IncomeForm
               editingIncome={editingIncome}
               onCancel={() => setEditingIncome(undefined)}
             />
-          </div>
+          </CardContent>
+        </Card>
 
-          <div className={styles.formSection}>
-            <h2 className={styles.sectionTitle}>
+        <Card>
+          <CardHeader>
+            <CardTitle>
               {editingExpense ? 'Edit Expense' : 'Add Expense'}
-            </h2>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
             <ExpenseForm
               editingExpense={editingExpense}
               onCancel={() => setEditingExpense(undefined)}
             />
-          </div>
-        </div>
+          </CardContent>
+        </Card>
       </div>
 
       {deleteTarget && (

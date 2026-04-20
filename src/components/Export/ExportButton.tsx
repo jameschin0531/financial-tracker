@@ -1,32 +1,20 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React from 'react';
 import { useFinancialData } from '../../context/FinancialDataContext';
 import { exportToCSV, exportToPDF } from './exportUtils';
-import styles from './ExportButton.module.css';
+import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Download } from 'lucide-react';
 
 const ExportButton: React.FC = () => {
   const { data } = useFinancialData();
-  const [isOpen, setIsOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    };
-
-    if (isOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [isOpen]);
 
   const handleExportCSV = () => {
     exportToCSV(data);
-    setIsOpen(false);
   };
 
   const handleExportPDF = async () => {
@@ -34,12 +22,10 @@ const ExportButton: React.FC = () => {
       await exportToPDF(data);
     } catch (error) {
       console.error('Error exporting PDF:', error);
-      alert('Error generating PDF. Please try again.');
     }
-    setIsOpen(false);
   };
 
-  const hasData = data.assets.length > 0 || data.liabilities.length > 0 || 
+  const hasData = data.assets.length > 0 || data.liabilities.length > 0 ||
                    data.income.length > 0 || data.expenses.length > 0;
 
   if (!hasData) {
@@ -47,49 +33,23 @@ const ExportButton: React.FC = () => {
   }
 
   return (
-    <div className={styles.exportContainer} ref={dropdownRef}>
-      <button
-        className={styles.exportButton}
-        onClick={() => setIsOpen(!isOpen)}
-        aria-label="Export data"
-        aria-expanded={isOpen}
-      >
-        Export
-        <span className={styles.arrow} aria-hidden="true">
-          <svg
-            viewBox="0 0 24 24"
-            className={`${styles.arrowIcon} ${isOpen ? styles.arrowUp : ''}`}
-          >
-            <path
-              d="M6 9l6 6 6-6"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </span>
-      </button>
-      {isOpen && (
-        <div className={styles.dropdown}>
-          <button
-            className={styles.dropdownItem}
-            onClick={handleExportCSV}
-          >
-            Export as CSV
-          </button>
-          <button
-            className={styles.dropdownItem}
-            onClick={handleExportPDF}
-          >
-            Export as PDF
-          </button>
-        </div>
-      )}
-    </div>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="sm" aria-label="Export data">
+          <Download className="h-4 w-4 mr-1.5" />
+          <span className="hidden sm:inline">Export</span>
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem onClick={handleExportCSV}>
+          Export as CSV
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={handleExportPDF}>
+          Export as PDF
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 };
 
 export default ExportButton;
-
