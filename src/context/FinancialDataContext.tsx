@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import type { ReactNode } from 'react';
+import { toast } from 'sonner';
 import type { Asset, Liability, Income, Expense, FinancialData, StockHolding, CryptoHolding, TradingAccount, CryptoAccount, Deposit } from '../types/financial';
 import { loadFinancialData, loadCachedFinancialData, saveCachedFinancialData, saveFinancialData } from '../services/storageService';
 import { getStockPrices } from '../services/stockPriceService';
@@ -96,17 +97,60 @@ export const FinancialDataProvider: React.FC<{ children: ReactNode }> = ({ child
   const { user } = useAuth();
   const [data, setData] = useState<FinancialData>(getDefaultData());
   const [isLoading, setIsLoading] = useState(true);
-  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const dataRef = useRef<FinancialData>(getDefaultData());
+  const userIdRef = useRef<string | null>(null);
+  const inFlightCountRef = useRef(0);
   const saveInFlightRef = useRef(false);
   const localDirtyRef = useRef(false);
   const initialRefreshRef = useRef<{ userId: string | null; inFlight: boolean }>({ userId: null, inFlight: false });
   const activeUserIdRef = useRef<string | null>(null);
   const loadingDataRef = useRef(false);
 
+  useEffect(() => {
+    userIdRef.current = user?.id ?? null;
+  }, [user]);
+
+  // Keep dataRef synchronized so mutation helpers always see the latest snapshot,
+  // even when called in the same tick before React re-renders.
+  const applyData = useCallback((next: FinancialData) => {
+    dataRef.current = next;
+    setData(next);
+  }, []);
+
+  const persist = useCallback(async (next: FinancialData) => {
+    applyData(next);
+
+    const userId = userIdRef.current;
+    if (!userId) {
+      return;
+    }
+
+    saveCachedFinancialData(userId, next);
+
+    localDirtyRef.current = true;
+    inFlightCountRef.current += 1;
+    saveInFlightRef.current = true;
+
+    try {
+      await saveFinancialData(userId, next);
+      if (inFlightCountRef.current === 1) {
+        localDirtyRef.current = false;
+      }
+    } catch (error) {
+      console.error('Error saving financial data:', error);
+      toast.error('Failed to save changes. Please try again.');
+    } finally {
+      inFlightCountRef.current -= 1;
+      if (inFlightCountRef.current === 0) {
+        saveInFlightRef.current = false;
+      }
+    }
+  }, [applyData]);
+
   const refreshDataFromServer = useCallback(async (userId: string, blockUi: boolean) => {
     if (shouldSkipBackgroundRefresh({
       blockUi,
-      hasPendingSaveTimeout: saveTimeoutRef.current !== null,
+      hasPendingSaveTimeout: false,
       isSaveInFlight: saveInFlightRef.current,
       isLocalDirty: localDirtyRef.current,
     })) {
@@ -133,7 +177,7 @@ export const FinancialDataProvider: React.FC<{ children: ReactNode }> = ({ child
         return;
       }
 
-      setData(loadedData);
+      applyData(loadedData);
       saveCachedFinancialData(userId, loadedData);
     } catch (error) {
       console.error('Error refreshing financial data from server:', error);
@@ -143,7 +187,7 @@ export const FinancialDataProvider: React.FC<{ children: ReactNode }> = ({ child
       }
       loadingDataRef.current = false;
     }
-  }, []);
+  }, [applyData]);
 
   // Load data when user logs in
   useEffect(() => {
@@ -151,7 +195,7 @@ export const FinancialDataProvider: React.FC<{ children: ReactNode }> = ({ child
       if (!user) {
         activeUserIdRef.current = null;
         // User logged out, reset to defaults
-        setData(getDefaultData());
+        applyData(getDefaultData());
         setIsLoading(false);
         return;
       }
@@ -161,7 +205,7 @@ export const FinancialDataProvider: React.FC<{ children: ReactNode }> = ({ child
       const cachedData = loadCachedFinancialData(user.id);
 
       if (cachedData) {
-        setData(cachedData);
+        applyData(cachedData);
         setIsLoading(false);
         void refreshDataFromServer(user.id, false);
         return;
@@ -171,13 +215,13 @@ export const FinancialDataProvider: React.FC<{ children: ReactNode }> = ({ child
         await refreshDataFromServer(user.id, true);
       } catch (error) {
         console.error('Error loading initial financial data:', error);
-        setData(getDefaultData());
+        applyData(getDefaultData());
         setIsLoading(false);
       }
     };
 
     loadData();
-  }, [user, refreshDataFromServer]);
+  }, [user, refreshDataFromServer, applyData]);
 
   useEffect(() => {
     if (!user) {
@@ -250,9 +294,10 @@ export const FinancialDataProvider: React.FC<{ children: ReactNode }> = ({ child
         cryptoSymbols.length > 0 ? getCryptoPrices(cryptoSymbols) : Promise.resolve(new Map<string, number>()),
       ]);
 
-      setData(prev => ({
-        ...prev,
-        stockHoldings: prev.stockHoldings.map(holding => {
+      const current = dataRef.current;
+      const next: FinancialData = {
+        ...current,
+        stockHoldings: current.stockHoldings.map(holding => {
           if (holding.stockType === 'Cash') {
             return holding;
           }
@@ -275,7 +320,7 @@ export const FinancialDataProvider: React.FC<{ children: ReactNode }> = ({ child
             exchangeRate: exchangeRate ?? holding.exchangeRate,
           };
         }),
-        cryptoHoldings: prev.cryptoHoldings.map(holding => {
+        cryptoHoldings: current.cryptoHoldings.map(holding => {
           const price = cryptoPrices.get(holding.symbol.toUpperCase());
           if (price === undefined && !usdToMyr) {
             return holding;
@@ -288,7 +333,9 @@ export const FinancialDataProvider: React.FC<{ children: ReactNode }> = ({ child
             exchangeRate: usdToMyr || holding.exchangeRate,
           };
         }),
-      }));
+      };
+
+      void persist(next);
     };
 
     refreshMarketData()
@@ -299,215 +346,151 @@ export const FinancialDataProvider: React.FC<{ children: ReactNode }> = ({ child
         initialRefreshRef.current.userId = user.id;
         initialRefreshRef.current.inFlight = false;
       });
-  }, [data.cryptoHoldings, data.stockHoldings, isLoading, user]);
-
-  // Debounced save when data changes
-  useEffect(() => {
-    if (isLoading || !user) {
-      return;
-    }
-
-    saveCachedFinancialData(user.id, data);
-
-    // Clear existing timeout
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current);
-      saveTimeoutRef.current = null;
-    }
-
-    // Set new timeout for debounced save
-    saveTimeoutRef.current = setTimeout(() => {
-      saveTimeoutRef.current = null;
-      saveInFlightRef.current = true;
-      saveFinancialData(user.id, data)
-        .then(() => {
-          localDirtyRef.current = false;
-        })
-        .catch((error) => {
-          console.error('Error saving financial data:', error);
-        })
-        .finally(() => {
-          saveInFlightRef.current = false;
-        });
-    }, 1000); // 1 second debounce
-
-    // Cleanup on unmount
-    return () => {
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
-        saveTimeoutRef.current = null;
-      }
-    };
-  }, [data, isLoading, user]);
-
-  // Wrapper that marks local state as dirty synchronously, so background
-  // refreshes triggered before the save-effect runs are blocked by the guard.
-  const setDataDirty = (updater: React.SetStateAction<FinancialData>) => {
-    localDirtyRef.current = true;
-    setData(updater);
-  };
+  }, [data.cryptoHoldings, data.stockHoldings, isLoading, user, persist]);
 
   const addAsset = (asset: Omit<Asset, 'id'>) => {
-    setDataDirty(prev => ({
-      ...prev,
-      assets: [...prev.assets, { ...asset, id: generateId() }],
-    }));
+    void persist({
+      ...dataRef.current,
+      assets: [...dataRef.current.assets, { ...asset, id: generateId() }],
+    });
   };
 
   const updateAsset = (id: string, asset: Partial<Asset>) => {
-    setDataDirty(prev => ({
-      ...prev,
-      assets: prev.assets.map(a => (a.id === id ? { ...a, ...asset } : a)),
-    }));
+    void persist({
+      ...dataRef.current,
+      assets: dataRef.current.assets.map(a => (a.id === id ? { ...a, ...asset } : a)),
+    });
   };
 
   const deleteAsset = (id: string) => {
-    setDataDirty(prev => ({
-      ...prev,
-      assets: prev.assets.filter(a => a.id !== id),
-    }));
+    void persist({
+      ...dataRef.current,
+      assets: dataRef.current.assets.filter(a => a.id !== id),
+    });
   };
 
   const addLiability = (liability: Omit<Liability, 'id'>) => {
-    setDataDirty(prev => ({
-      ...prev,
-      liabilities: [...prev.liabilities, { ...liability, id: generateId() }],
-    }));
+    void persist({
+      ...dataRef.current,
+      liabilities: [...dataRef.current.liabilities, { ...liability, id: generateId() }],
+    });
   };
 
   const updateLiability = (id: string, liability: Partial<Liability>) => {
-    setDataDirty(prev => ({
-      ...prev,
-      liabilities: prev.liabilities.map(l => (l.id === id ? { ...l, ...liability } : l)),
-    }));
+    void persist({
+      ...dataRef.current,
+      liabilities: dataRef.current.liabilities.map(l => (l.id === id ? { ...l, ...liability } : l)),
+    });
   };
 
   const deleteLiability = (id: string) => {
-    setDataDirty(prev => ({
-      ...prev,
-      liabilities: prev.liabilities.filter(l => l.id !== id),
-    }));
+    void persist({
+      ...dataRef.current,
+      liabilities: dataRef.current.liabilities.filter(l => l.id !== id),
+    });
   };
 
   const addIncome = (income: Omit<Income, 'id'>) => {
-    setDataDirty(prev => ({
-      ...prev,
-      income: [...prev.income, { ...income, id: generateId() }],
-    }));
+    void persist({
+      ...dataRef.current,
+      income: [...dataRef.current.income, { ...income, id: generateId() }],
+    });
   };
 
   const updateIncome = (id: string, income: Partial<Income>) => {
-    setDataDirty(prev => ({
-      ...prev,
-      income: prev.income.map(i => (i.id === id ? { ...i, ...income } : i)),
-    }));
+    void persist({
+      ...dataRef.current,
+      income: dataRef.current.income.map(i => (i.id === id ? { ...i, ...income } : i)),
+    });
   };
 
   const deleteIncome = (id: string) => {
-    setDataDirty(prev => ({
-      ...prev,
-      income: prev.income.filter(i => i.id !== id),
-    }));
+    void persist({
+      ...dataRef.current,
+      income: dataRef.current.income.filter(i => i.id !== id),
+    });
   };
 
   const addExpense = (expense: Omit<Expense, 'id'>) => {
-    setDataDirty(prev => ({
-      ...prev,
-      expenses: [...prev.expenses, { ...expense, id: generateId() }],
-    }));
+    void persist({
+      ...dataRef.current,
+      expenses: [...dataRef.current.expenses, { ...expense, id: generateId() }],
+    });
   };
 
   const updateExpense = (id: string, expense: Partial<Expense>) => {
-    setDataDirty(prev => ({
-      ...prev,
-      expenses: prev.expenses.map(e => (e.id === id ? { ...e, ...expense } : e)),
-    }));
+    void persist({
+      ...dataRef.current,
+      expenses: dataRef.current.expenses.map(e => (e.id === id ? { ...e, ...expense } : e)),
+    });
   };
 
   const deleteExpense = (id: string) => {
-    setDataDirty(prev => ({
-      ...prev,
-      expenses: prev.expenses.filter(e => e.id !== id),
-    }));
+    void persist({
+      ...dataRef.current,
+      expenses: dataRef.current.expenses.filter(e => e.id !== id),
+    });
   };
 
   const addAssetCategory = (category: string) => {
-    const trimmedCategory = category.trim();
-    if (!trimmedCategory) return;
-
-    localDirtyRef.current = true;
-    setData(prev => {
-      if (prev.assetCategories.includes(trimmedCategory)) {
-        return prev;
-      }
-      return {
-        ...prev,
-        assetCategories: [...prev.assetCategories, trimmedCategory],
-      };
+    const trimmed = category.trim();
+    if (!trimmed) return;
+    if (dataRef.current.assetCategories.includes(trimmed)) return;
+    void persist({
+      ...dataRef.current,
+      assetCategories: [...dataRef.current.assetCategories, trimmed],
     });
   };
 
   const addLiabilityCategory = (category: string) => {
-    const trimmedCategory = category.trim();
-    if (!trimmedCategory) return;
-
-    localDirtyRef.current = true;
-    setData(prev => {
-      if (prev.liabilityCategories.includes(trimmedCategory)) {
-        return prev;
-      }
-      return {
-        ...prev,
-        liabilityCategories: [...prev.liabilityCategories, trimmedCategory],
-      };
+    const trimmed = category.trim();
+    if (!trimmed) return;
+    if (dataRef.current.liabilityCategories.includes(trimmed)) return;
+    void persist({
+      ...dataRef.current,
+      liabilityCategories: [...dataRef.current.liabilityCategories, trimmed],
     });
   };
 
   const addExpenseCategory = (category: string) => {
-    const trimmedCategory = category.trim();
-    if (!trimmedCategory) return;
-
-    localDirtyRef.current = true;
-    setData(prev => {
-      if (prev.expenseCategories.includes(trimmedCategory)) {
-        return prev;
-      }
-      return {
-        ...prev,
-        expenseCategories: [...prev.expenseCategories, trimmedCategory],
-      };
+    const trimmed = category.trim();
+    if (!trimmed) return;
+    if (dataRef.current.expenseCategories.includes(trimmed)) return;
+    void persist({
+      ...dataRef.current,
+      expenseCategories: [...dataRef.current.expenseCategories, trimmed],
     });
   };
 
   // Stock Holdings
   const addStockHolding = (holding: Omit<StockHolding, 'id'>) => {
-    setDataDirty(prev => ({
-      ...prev,
-      stockHoldings: [...prev.stockHoldings, { ...holding, id: generateId() }],
-    }));
+    void persist({
+      ...dataRef.current,
+      stockHoldings: [...dataRef.current.stockHoldings, { ...holding, id: generateId() }],
+    });
   };
 
   const updateStockHolding = (id: string, holding: Partial<StockHolding>) => {
-    setDataDirty(prev => ({
-      ...prev,
-      stockHoldings: prev.stockHoldings.map(h => (h.id === id ? { ...h, ...holding } : h)),
-    }));
+    void persist({
+      ...dataRef.current,
+      stockHoldings: dataRef.current.stockHoldings.map(h => (h.id === id ? { ...h, ...holding } : h)),
+    });
   };
 
   const deleteStockHolding = (id: string) => {
-    setDataDirty(prev => ({
-      ...prev,
-      stockHoldings: prev.stockHoldings.filter(h => h.id !== id),
-    }));
+    void persist({
+      ...dataRef.current,
+      stockHoldings: dataRef.current.stockHoldings.filter(h => h.id !== id),
+    });
   };
 
   const updateStockPrice = (id: string, price: number) => {
-    setDataDirty(prev => ({
-      ...prev,
-      stockHoldings: prev.stockHoldings.map(h =>
+    void persist({
+      ...dataRef.current,
+      stockHoldings: dataRef.current.stockHoldings.map(h =>
         h.id === id ? { ...h, marketPrice: price, lastUpdated: new Date().toISOString() } : h
       ),
-    }));
+    });
   };
 
   const updateStockPrices = (prices: Map<string, number>) => {
@@ -516,9 +499,9 @@ export const FinancialDataProvider: React.FC<{ children: ReactNode }> = ({ child
     }
 
     const timestamp = new Date().toISOString();
-    setDataDirty(prev => ({
-      ...prev,
-      stockHoldings: prev.stockHoldings.map(h => {
+    void persist({
+      ...dataRef.current,
+      stockHoldings: dataRef.current.stockHoldings.map(h => {
         if (h.stockType === 'Cash') {
           return h;
         }
@@ -527,38 +510,38 @@ export const FinancialDataProvider: React.FC<{ children: ReactNode }> = ({ child
           ? h
           : { ...h, marketPrice: price, lastUpdated: timestamp };
       }),
-    }));
+    });
   };
 
   // Crypto Holdings
   const addCryptoHolding = (holding: Omit<CryptoHolding, 'id'>) => {
-    setDataDirty(prev => ({
-      ...prev,
-      cryptoHoldings: [...prev.cryptoHoldings, { ...holding, id: generateId() }],
-    }));
+    void persist({
+      ...dataRef.current,
+      cryptoHoldings: [...dataRef.current.cryptoHoldings, { ...holding, id: generateId() }],
+    });
   };
 
   const updateCryptoHolding = (id: string, holding: Partial<CryptoHolding>) => {
-    setDataDirty(prev => ({
-      ...prev,
-      cryptoHoldings: prev.cryptoHoldings.map(h => (h.id === id ? { ...h, ...holding } : h)),
-    }));
+    void persist({
+      ...dataRef.current,
+      cryptoHoldings: dataRef.current.cryptoHoldings.map(h => (h.id === id ? { ...h, ...holding } : h)),
+    });
   };
 
   const deleteCryptoHolding = (id: string) => {
-    setDataDirty(prev => ({
-      ...prev,
-      cryptoHoldings: prev.cryptoHoldings.filter(h => h.id !== id),
-    }));
+    void persist({
+      ...dataRef.current,
+      cryptoHoldings: dataRef.current.cryptoHoldings.filter(h => h.id !== id),
+    });
   };
 
   const updateCryptoPrice = (id: string, price: number) => {
-    setDataDirty(prev => ({
-      ...prev,
-      cryptoHoldings: prev.cryptoHoldings.map(h =>
+    void persist({
+      ...dataRef.current,
+      cryptoHoldings: dataRef.current.cryptoHoldings.map(h =>
         h.id === id ? { ...h, marketPrice: price, lastUpdated: new Date().toISOString() } : h
       ),
-    }));
+    });
   };
 
   const updateCryptoPrices = (prices: Map<string, number>) => {
@@ -567,81 +550,81 @@ export const FinancialDataProvider: React.FC<{ children: ReactNode }> = ({ child
     }
 
     const timestamp = new Date().toISOString();
-    setDataDirty(prev => ({
-      ...prev,
-      cryptoHoldings: prev.cryptoHoldings.map(h => {
+    void persist({
+      ...dataRef.current,
+      cryptoHoldings: dataRef.current.cryptoHoldings.map(h => {
         const price = prices.get(h.symbol.toUpperCase());
         return price === undefined
           ? h
           : { ...h, marketPrice: price, lastUpdated: timestamp };
       }),
-    }));
+    });
   };
 
   // Trading Accounts
   const addTradingAccount = (account: Omit<TradingAccount, 'id'>) => {
-    setDataDirty(prev => ({
-      ...prev,
-      tradingAccounts: [...prev.tradingAccounts, { ...account, id: generateId() }],
-    }));
+    void persist({
+      ...dataRef.current,
+      tradingAccounts: [...dataRef.current.tradingAccounts, { ...account, id: generateId() }],
+    });
   };
 
   const updateTradingAccount = (id: string, account: Partial<TradingAccount>) => {
-    setDataDirty(prev => ({
-      ...prev,
-      tradingAccounts: prev.tradingAccounts.map(a => (a.id === id ? { ...a, ...account } : a)),
-    }));
+    void persist({
+      ...dataRef.current,
+      tradingAccounts: dataRef.current.tradingAccounts.map(a => (a.id === id ? { ...a, ...account } : a)),
+    });
   };
 
   const deleteTradingAccount = (id: string) => {
-    setDataDirty(prev => ({
-      ...prev,
-      tradingAccounts: prev.tradingAccounts.filter(a => a.id !== id),
-    }));
+    void persist({
+      ...dataRef.current,
+      tradingAccounts: dataRef.current.tradingAccounts.filter(a => a.id !== id),
+    });
   };
 
   // Crypto Accounts
   const addCryptoAccount = (account: Omit<CryptoAccount, 'id'>) => {
-    setDataDirty(prev => ({
-      ...prev,
-      cryptoAccounts: [...prev.cryptoAccounts, { ...account, id: generateId() }],
-    }));
+    void persist({
+      ...dataRef.current,
+      cryptoAccounts: [...dataRef.current.cryptoAccounts, { ...account, id: generateId() }],
+    });
   };
 
   const updateCryptoAccount = (id: string, account: Partial<CryptoAccount>) => {
-    setDataDirty(prev => ({
-      ...prev,
-      cryptoAccounts: prev.cryptoAccounts.map(a => (a.id === id ? { ...a, ...account } : a)),
-    }));
+    void persist({
+      ...dataRef.current,
+      cryptoAccounts: dataRef.current.cryptoAccounts.map(a => (a.id === id ? { ...a, ...account } : a)),
+    });
   };
 
   const deleteCryptoAccount = (id: string) => {
-    setDataDirty(prev => ({
-      ...prev,
-      cryptoAccounts: prev.cryptoAccounts.filter(a => a.id !== id),
-    }));
+    void persist({
+      ...dataRef.current,
+      cryptoAccounts: dataRef.current.cryptoAccounts.filter(a => a.id !== id),
+    });
   };
 
   // Deposits
   const addDeposit = (deposit: Omit<Deposit, 'id'>) => {
-    setDataDirty(prev => ({
-      ...prev,
-      deposits: [...prev.deposits, { ...deposit, id: generateId() }],
-    }));
+    void persist({
+      ...dataRef.current,
+      deposits: [...dataRef.current.deposits, { ...deposit, id: generateId() }],
+    });
   };
 
   const updateDeposit = (id: string, deposit: Partial<Deposit>) => {
-    setDataDirty(prev => ({
-      ...prev,
-      deposits: prev.deposits.map(d => (d.id === id ? { ...d, ...deposit } : d)),
-    }));
+    void persist({
+      ...dataRef.current,
+      deposits: dataRef.current.deposits.map(d => (d.id === id ? { ...d, ...deposit } : d)),
+    });
   };
 
   const deleteDeposit = (id: string) => {
-    setDataDirty(prev => ({
-      ...prev,
-      deposits: prev.deposits.filter(d => d.id !== id),
-    }));
+    void persist({
+      ...dataRef.current,
+      deposits: dataRef.current.deposits.filter(d => d.id !== id),
+    });
   };
 
   // Show skeleton loading state while data is being loaded
