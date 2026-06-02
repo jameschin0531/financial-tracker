@@ -102,6 +102,9 @@ export const FinancialDataProvider: React.FC<{ children: ReactNode }> = ({ child
   const inFlightCountRef = useRef(0);
   const saveInFlightRef = useRef(false);
   const localDirtyRef = useRef(false);
+  // Bumped on every local mutation. A server refresh that started before a
+  // mutation must not clobber the newer local data once it resolves.
+  const mutationGenerationRef = useRef(0);
   const initialRefreshRef = useRef<{ userId: string | null; inFlight: boolean }>({ userId: null, inFlight: false });
   const activeUserIdRef = useRef<string | null>(null);
   const loadingDataRef = useRef(false);
@@ -119,6 +122,7 @@ export const FinancialDataProvider: React.FC<{ children: ReactNode }> = ({ child
 
   const persist = useCallback(async (next: FinancialData) => {
     applyData(next);
+    mutationGenerationRef.current += 1;
 
     const userId = userIdRef.current;
     if (!userId) {
@@ -166,6 +170,8 @@ export const FinancialDataProvider: React.FC<{ children: ReactNode }> = ({ child
       setIsLoading(true);
     }
 
+    const mutationGenerationAtStart = mutationGenerationRef.current;
+
     try {
       const loadedData = await withTimeout(
         loadFinancialData(userId),
@@ -174,6 +180,13 @@ export const FinancialDataProvider: React.FC<{ children: ReactNode }> = ({ child
       );
 
       if (activeUserIdRef.current !== userId) {
+        return;
+      }
+
+      // A local mutation happened while this refresh was in flight. The loaded
+      // snapshot is now stale — discarding it avoids reverting unsaved edits
+      // (and the cache) back to the pre-edit server state.
+      if (mutationGenerationRef.current !== mutationGenerationAtStart) {
         return;
       }
 
