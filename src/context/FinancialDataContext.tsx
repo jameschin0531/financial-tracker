@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useRef, useCallb
 import type { ReactNode } from 'react';
 import { toast } from 'sonner';
 import type { Asset, Liability, Income, Expense, FinancialData, StockHolding, CryptoHolding, TradingAccount, CryptoAccount, Deposit } from '../types/financial';
+import { addCategory, removeCategory } from '../utils/categoryList';
 import {
   loadFinancialData,
   loadCachedFinancialData,
@@ -33,6 +34,7 @@ interface FinancialDataContextType {
   addAssetCategory: (category: string) => void;
   addLiabilityCategory: (category: string) => void;
   addExpenseCategory: (category: string) => void;
+  deleteExpenseCategory: (category: string) => void;
   // Stock tracking
   addStockHolding: (holding: Omit<StockHolding, 'id'>) => void;
   updateStockHolding: (id: string, holding: Partial<StockHolding>) => void;
@@ -550,33 +552,27 @@ export const FinancialDataProvider: React.FC<{ children: ReactNode }> = ({ child
   };
 
   const addAssetCategory = (category: string) => {
-    const trimmed = category.trim();
-    if (!trimmed) return;
-    if (dataRef.current.assetCategories.includes(trimmed)) return;
-    void persist({
-      ...dataRef.current,
-      assetCategories: [...dataRef.current.assetCategories, trimmed],
-    });
+    const assetCategories = addCategory(dataRef.current.assetCategories, category);
+    if (assetCategories === dataRef.current.assetCategories) return;
+    void persist({ ...dataRef.current, assetCategories });
   };
 
   const addLiabilityCategory = (category: string) => {
-    const trimmed = category.trim();
-    if (!trimmed) return;
-    if (dataRef.current.liabilityCategories.includes(trimmed)) return;
-    void persist({
-      ...dataRef.current,
-      liabilityCategories: [...dataRef.current.liabilityCategories, trimmed],
-    });
+    const liabilityCategories = addCategory(dataRef.current.liabilityCategories, category);
+    if (liabilityCategories === dataRef.current.liabilityCategories) return;
+    void persist({ ...dataRef.current, liabilityCategories });
   };
 
   const addExpenseCategory = (category: string) => {
-    const trimmed = category.trim();
-    if (!trimmed) return;
-    if (dataRef.current.expenseCategories.includes(trimmed)) return;
-    void persist({
-      ...dataRef.current,
-      expenseCategories: [...dataRef.current.expenseCategories, trimmed],
-    });
+    const expenseCategories = addCategory(dataRef.current.expenseCategories, category);
+    if (expenseCategories === dataRef.current.expenseCategories) return;
+    void persist({ ...dataRef.current, expenseCategories });
+  };
+
+  const deleteExpenseCategory = (category: string) => {
+    const expenseCategories = removeCategory(dataRef.current.expenseCategories, category);
+    if (expenseCategories === dataRef.current.expenseCategories) return;
+    void persist({ ...dataRef.current, expenseCategories });
   };
 
   // Stock Holdings
@@ -781,6 +777,7 @@ export const FinancialDataProvider: React.FC<{ children: ReactNode }> = ({ child
         addAssetCategory,
         addLiabilityCategory,
         addExpenseCategory,
+        deleteExpenseCategory,
         addStockHolding,
         updateStockHolding,
         deleteStockHolding,

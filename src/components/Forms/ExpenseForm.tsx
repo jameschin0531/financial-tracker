@@ -6,6 +6,8 @@ import { useFinancialData } from '../../context/FinancialDataContext';
 import type { Expense, Currency } from '../../types/financial';
 import { getUSDToMYRRate } from '../../services/exchangeRateService';
 import { preventNumberInputScroll } from './IncomeForm';
+import { isCategoryInUse, resolveCategory } from '@/utils/categoryList';
+import ConfirmModal from '@/components/Layout/ConfirmModal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Form, FormField, FormItem, FormLabel, FormControl, FormDescription, FormMessage } from '@/components/ui/form';
@@ -27,11 +29,12 @@ interface ExpenseFormProps {
 }
 
 const ExpenseForm: React.FC<ExpenseFormProps> = ({ editingExpense, onCancel }) => {
-  const { data, addExpense, updateExpense, addExpenseCategory } = useFinancialData();
+  const { data, addExpense, updateExpense, addExpenseCategory, deleteExpenseCategory } = useFinancialData();
   const [showNewCategory, setShowNewCategory] = useState(false);
   const [newCategory, setNewCategory] = useState('');
   const [exchangeRate, setExchangeRate] = useState<number | undefined>(editingExpense?.exchangeRate);
   const [loadingRate, setLoadingRate] = useState(false);
+  const [categoryPendingDelete, setCategoryPendingDelete] = useState<string | null>(null);
 
   const form = useForm<ExpenseFormValues>({
     resolver: zodResolver(expenseFormSchema),
@@ -70,7 +73,22 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ editingExpense, onCancel }) =
       setShowNewCategory(false);
       setNewCategory('');
     }
-  }, [editingExpense, data.expenseCategories, form]);
+    // Deliberately does NOT depend on data.expenseCategories: adding or deleting
+    // a category re-creates that array, and resetting here would wipe whatever
+    // the user is typing into the "new category" field.
+  }, [editingExpense, form]);
+
+  // Keep the selected category valid when the list changes (e.g. after a delete,
+  // or once remote data finishes loading).
+  useEffect(() => {
+    if (showNewCategory) {
+      return;
+    }
+    const selected = form.getValues('category');
+    if (!selected || !data.expenseCategories.includes(selected)) {
+      form.setValue('category', data.expenseCategories[0] || '');
+    }
+  }, [data.expenseCategories, showNewCategory, form]);
 
   useEffect(() => {
     if (watchedCurrency === 'USD' && !exchangeRate) {
@@ -95,8 +113,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ editingExpense, onCancel }) =
 
     let finalCategory = values.category;
     if (showNewCategory && newCategory.trim()) {
-      addExpenseCategory(newCategory.trim());
-      finalCategory = newCategory.trim();
+      finalCategory = commitNewCategory(newCategory) ?? finalCategory;
     }
 
     const expenseData: Omit<Expense, 'id'> = {
@@ -125,6 +142,52 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ editingExpense, onCancel }) =
     }
   };
 
+  const selectedCategory = form.watch('category');
+  const categoryInUse = isCategoryInUse(data.expenses, selectedCategory);
+  const canDeleteCategory =
+    !showNewCategory && Boolean(selectedCategory) && data.expenseCategories.length > 1 && !categoryInUse;
+  const deleteCategoryHint = categoryInUse
+    ? 'This category is used by an existing expense'
+    : data.expenseCategories.length <= 1
+      ? 'At least one category is required'
+      : `Delete category "${selectedCategory}"`;
+
+  /**
+   * Add the typed category (if any) and select it. Returns the canonical name
+   * that was selected, or null when the input was blank.
+   */
+  const commitNewCategory = (name: string): string | null => {
+    const trimmed = name.trim();
+    if (!trimmed) {
+      return null;
+    }
+    // Reuse the stored spelling when the name already exists in another casing,
+    // so expenses never reference a category missing from the list.
+    const finalCategory = resolveCategory(data.expenseCategories, trimmed);
+    addExpenseCategory(finalCategory);
+    form.setValue('category', finalCategory);
+    setShowNewCategory(false);
+    setNewCategory('');
+    return finalCategory;
+  };
+
+  const handleAddCategory = () => {
+    commitNewCategory(newCategory);
+  };
+
+  const handleDeleteCategory = () => {
+    const target = categoryPendingDelete;
+    setCategoryPendingDelete(null);
+    if (!target) {
+      return;
+    }
+    const remaining = data.expenseCategories.filter(
+      cat => cat.toLowerCase() !== target.toLowerCase(),
+    );
+    deleteExpenseCategory(target);
+    form.setValue('category', remaining[0] || '');
+  };
+
   const handleCategorySelectChange = (value: string) => {
     if (value === '__new__') {
       setShowNewCategory(true);
@@ -146,29 +209,58 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ editingExpense, onCancel }) =
                   Category
                 </FormLabel>
                 {!showNewCategory ? (
-                  <Select value={field.value} onValueChange={handleCategorySelectChange}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select category" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {data.expenseCategories.map(cat => (
-                        <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                      ))}
-                      <SelectItem value="__new__">+ Add New Category</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <div className="flex gap-2">
+                    <Select value={field.value} onValueChange={handleCategorySelectChange}>
+                      <FormControl>
+                        <SelectTrigger className="flex-1">
+                          <SelectValue placeholder="Select category" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {data.expenseCategories.map(cat => (
+                          <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                        ))}
+                        <SelectItem value="__new__">+ Add New Category</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={!canDeleteCategory}
+                      title={deleteCategoryHint}
+                      onClick={() => setCategoryPendingDelete(selectedCategory)}
+                    >
+                      Delete
+                    </Button>
+                  </div>
                 ) : (
                   <FormControl>
                     <div className="flex gap-2">
                       <Input
                         type="text"
                         value={newCategory}
-                        onChange={(e) => setNewCategory(e.target.value)}
+                        onChange={(e) => {
+                          setNewCategory(e.target.value);
+                          // Mirror into the form field so validation sees a value
+                          // when the expense is submitted with a brand new category.
+                          form.setValue('category', e.target.value);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleAddCategory();
+                          }
+                        }}
                         placeholder="Enter new category name"
                         autoFocus
                       />
+                      <Button
+                        type="button"
+                        onClick={handleAddCategory}
+                        disabled={!newCategory.trim()}
+                      >
+                        Add
+                      </Button>
                       <Button
                         type="button"
                         variant="outline"
@@ -272,6 +364,15 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ editingExpense, onCancel }) =
               )}
             </div>
       </form>
+
+      {categoryPendingDelete && (
+        <ConfirmModal
+          title="Delete Category"
+          message={`Are you sure you want to delete the category "${categoryPendingDelete}"? This action cannot be undone.`}
+          onConfirm={handleDeleteCategory}
+          onCancel={() => setCategoryPendingDelete(null)}
+        />
+      )}
     </Form>
   );
 };
