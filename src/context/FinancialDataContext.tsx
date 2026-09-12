@@ -2,12 +2,19 @@ import React, { createContext, useContext, useState, useEffect, useRef, useCallb
 import type { ReactNode } from 'react';
 import { toast } from 'sonner';
 import type { Asset, Liability, Income, Expense, FinancialData, StockHolding, CryptoHolding, TradingAccount, CryptoAccount, Deposit } from '../types/financial';
-import { loadFinancialData, loadCachedFinancialData, saveCachedFinancialData, saveFinancialData } from '../services/storageService';
+import {
+  loadFinancialData,
+  loadCachedFinancialData,
+  saveCachedFinancialData,
+  saveFinancialData,
+  saveFinancialDataOnUnload,
+} from '../services/storageService';
 import { getStockPrices } from '../services/stockPriceService';
 import { getCryptoPrices } from '../services/cryptoPriceService';
 import { getHKDToMYRRate, getUSDToMYRRate } from '../services/exchangeRateService';
 import { useAuth } from './AuthContext';
 import { shouldSkipBackgroundRefresh } from './refreshGuards';
+import { computeRetryBackoffMs } from './saveScheduling';
 
 interface FinancialDataContextType {
   data: FinancialData;
@@ -94,7 +101,7 @@ const withTimeout = async <T,>(promise: Promise<T>, timeoutMs: number, message: 
 };
 
 export const FinancialDataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   const [data, setData] = useState<FinancialData>(getDefaultData());
   const [isLoading, setIsLoading] = useState(true);
   const dataRef = useRef<FinancialData>(getDefaultData());
@@ -108,10 +115,15 @@ export const FinancialDataProvider: React.FC<{ children: ReactNode }> = ({ child
   const initialRefreshRef = useRef<{ userId: string | null; inFlight: boolean }>({ userId: null, inFlight: false });
   const activeUserIdRef = useRef<string | null>(null);
   const loadingDataRef = useRef(false);
+  const accessTokenRef = useRef<string | null>(null);
+  const saveRetryCountRef = useRef(0);
+  const retryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const retryFailedSaveRef = useRef<() => void>(() => {});
 
   useEffect(() => {
     userIdRef.current = user?.id ?? null;
-  }, [user]);
+    accessTokenRef.current = session?.access_token ?? null;
+  }, [user, session]);
 
   // Keep dataRef synchronized so mutation helpers always see the latest snapshot,
   // even when called in the same tick before React re-renders.
@@ -120,6 +132,19 @@ export const FinancialDataProvider: React.FC<{ children: ReactNode }> = ({ child
     setData(next);
   }, []);
 
+  const clearPendingRetry = useCallback(() => {
+    if (retryTimeoutRef.current) {
+      clearTimeout(retryTimeoutRef.current);
+      retryTimeoutRef.current = null;
+    }
+  }, []);
+
+  /**
+   * Write `next` to the server, keeping the cache marked dirty until the write
+   * is acknowledged. A dirty cache entry is what makes an unacknowledged edit
+   * survive a reload: it is replayed instead of being replaced by the older
+   * server copy.
+   */
   const persist = useCallback(async (next: FinancialData) => {
     applyData(next);
     mutationGenerationRef.current += 1;
@@ -129,27 +154,97 @@ export const FinancialDataProvider: React.FC<{ children: ReactNode }> = ({ child
       return;
     }
 
-    saveCachedFinancialData(userId, next);
+    const generationAtStart = mutationGenerationRef.current;
 
+    saveCachedFinancialData(userId, next, true);
+
+    clearPendingRetry();
     localDirtyRef.current = true;
     inFlightCountRef.current += 1;
     saveInFlightRef.current = true;
 
     try {
       await saveFinancialData(userId, next);
-      if (inFlightCountRef.current === 1) {
+
+      saveRetryCountRef.current = 0;
+
+      // Only settle if nothing changed while this write was in flight;
+      // otherwise the newer edit still owns the dirty state.
+      if (mutationGenerationRef.current === generationAtStart && userIdRef.current === userId) {
         localDirtyRef.current = false;
+        saveCachedFinancialData(userId, next, false);
       }
     } catch (error) {
       console.error('Error saving financial data:', error);
-      toast.error('Failed to save changes. Please try again.');
+
+      // Stay dirty so a background refresh cannot overwrite the pending edit,
+      // and retry rather than leaving the change stranded in the cache.
+      saveRetryCountRef.current += 1;
+      toast.error('Could not save changes - retrying');
+
+      clearPendingRetry();
+      retryTimeoutRef.current = setTimeout(() => {
+        retryTimeoutRef.current = null;
+        retryFailedSaveRef.current();
+      }, computeRetryBackoffMs(saveRetryCountRef.current));
     } finally {
       inFlightCountRef.current -= 1;
       if (inFlightCountRef.current === 0) {
         saveInFlightRef.current = false;
       }
     }
-  }, [applyData]);
+  }, [applyData, clearPendingRetry]);
+
+  // Retries re-send whatever the newest local snapshot is, not the payload that
+  // originally failed.
+  useEffect(() => {
+    retryFailedSaveRef.current = () => {
+      if (!userIdRef.current || !localDirtyRef.current) {
+        return;
+      }
+
+      void persist(dataRef.current);
+    };
+  }, [persist]);
+
+  // Persist unsaved work when the page is hidden or torn down.
+  useEffect(() => {
+    // Tab hidden but still running JS (tab switch, minimise, mobile
+    // backgrounding): a normal save works and its result is observable.
+    const handleHidden = () => {
+      if (document.visibilityState !== 'hidden') {
+        return;
+      }
+
+      if (!userIdRef.current || !localDirtyRef.current || saveInFlightRef.current) {
+        return;
+      }
+
+      void persist(dataRef.current);
+    };
+
+    // The page is actually going away. A normal request would be aborted, so
+    // this is a fire-and-forget `keepalive` attempt. The cache entry stays
+    // dirty, so if it does not land the next load replays it.
+    const handleTeardown = () => {
+      if (!userIdRef.current || !localDirtyRef.current) {
+        return;
+      }
+
+      saveFinancialDataOnUnload(userIdRef.current, dataRef.current, accessTokenRef.current);
+    };
+
+    document.addEventListener('visibilitychange', handleHidden);
+    window.addEventListener('pagehide', handleTeardown);
+    window.addEventListener('beforeunload', handleTeardown);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleHidden);
+      window.removeEventListener('pagehide', handleTeardown);
+      window.removeEventListener('beforeunload', handleTeardown);
+      clearPendingRetry();
+    };
+  }, [persist, clearPendingRetry]);
 
   const refreshDataFromServer = useCallback(async (userId: string, blockUi: boolean) => {
     if (shouldSkipBackgroundRefresh({
@@ -191,7 +286,7 @@ export const FinancialDataProvider: React.FC<{ children: ReactNode }> = ({ child
       }
 
       applyData(loadedData);
-      saveCachedFinancialData(userId, loadedData);
+      saveCachedFinancialData(userId, loadedData, false);
     } catch (error) {
       console.error('Error refreshing financial data from server:', error);
     } finally {
@@ -215,26 +310,35 @@ export const FinancialDataProvider: React.FC<{ children: ReactNode }> = ({ child
 
       activeUserIdRef.current = user.id;
 
-      const cachedData = loadCachedFinancialData(user.id);
+      const cached = loadCachedFinancialData(user.id);
 
-      if (cachedData) {
-        applyData(cachedData);
+      if (cached) {
+        applyData(cached.data);
+        localDirtyRef.current = cached.dirty;
         setIsLoading(false);
-        void refreshDataFromServer(user.id, false);
+
+        if (cached.dirty) {
+          // A previous session ended before its save landed. Push it now
+          // instead of pulling the stale server copy over it.
+          void persist(cached.data);
+        } else {
+          void refreshDataFromServer(user.id, false);
+        }
         return;
       }
 
       try {
         await refreshDataFromServer(user.id, true);
       } catch (error) {
+        // Keep whatever is on screen: resetting to defaults would let the next
+        // mutation persist an empty dataset over the user's real records.
         console.error('Error loading initial financial data:', error);
-        applyData(getDefaultData());
         setIsLoading(false);
       }
     };
 
     loadData();
-  }, [user, refreshDataFromServer, applyData]);
+  }, [user, refreshDataFromServer, applyData, persist]);
 
   useEffect(() => {
     if (!user) {

@@ -35,13 +35,26 @@ describe("shouldSkipBackgroundRefresh", () => {
     ).toBe(true);
   });
 
-  test("does not skip blocking refresh even when dirty", () => {
+  test("skips a blocking refresh too when local state is dirty", () => {
+    // A blocking initial load can run while a cached dirty snapshot is still
+    // waiting to be pushed; the server copy must not overwrite it.
     expect(
       shouldSkipBackgroundRefresh({
         blockUi: true,
-        hasPendingSaveTimeout: true,
-        isSaveInFlight: true,
+        hasPendingSaveTimeout: false,
+        isSaveInFlight: false,
         isLocalDirty: true,
+      }),
+    ).toBe(true);
+  });
+
+  test("does not skip a blocking refresh when nothing is pending", () => {
+    expect(
+      shouldSkipBackgroundRefresh({
+        blockUi: true,
+        hasPendingSaveTimeout: false,
+        isSaveInFlight: false,
+        isLocalDirty: false,
       }),
     ).toBe(false);
   });

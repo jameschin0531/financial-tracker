@@ -6,14 +6,12 @@ export interface RefreshGuardInput {
 }
 
 export const shouldSkipBackgroundRefresh = ({
-  blockUi,
   hasPendingSaveTimeout,
   isSaveInFlight,
   isLocalDirty,
 }: RefreshGuardInput): boolean => {
-  if (blockUi) {
-    return false;
-  }
-
+  // `blockUi` deliberately does not grant a bypass: a blocking initial load may
+  // run while a cached dirty snapshot is still waiting to be pushed, and the
+  // server copy would overwrite it.
   return hasPendingSaveTimeout || isSaveInFlight || isLocalDirty;
 };
