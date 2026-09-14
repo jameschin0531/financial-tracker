@@ -4,6 +4,8 @@ import { toast } from 'sonner';
 import type { Asset, Liability, Income, Expense, FinancialData, StockHolding, CryptoHolding, TradingAccount, CryptoAccount, Deposit } from '../types/financial';
 import { addCategory, removeCategory } from '../utils/categoryList';
 import {
+  backupUnreplayableSnapshot,
+  canReplayDirtyCache,
   loadFinancialData,
   loadCachedFinancialData,
   saveCachedFinancialData,
@@ -118,6 +120,8 @@ export const FinancialDataProvider: React.FC<{ children: ReactNode }> = ({ child
   const activeUserIdRef = useRef<string | null>(null);
   const loadingDataRef = useRef(false);
   const accessTokenRef = useRef<string | null>(null);
+  /** `updated_at` of the server row our state is in sync with. */
+  const serverUpdatedAtRef = useRef<string | null>(null);
   const saveRetryCountRef = useRef(0);
   const retryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const retryFailedSaveRef = useRef<() => void>(() => {});
@@ -158,7 +162,7 @@ export const FinancialDataProvider: React.FC<{ children: ReactNode }> = ({ child
 
     const generationAtStart = mutationGenerationRef.current;
 
-    saveCachedFinancialData(userId, next, true);
+    saveCachedFinancialData(userId, next, true, serverUpdatedAtRef.current);
 
     clearPendingRetry();
     localDirtyRef.current = true;
@@ -166,15 +170,16 @@ export const FinancialDataProvider: React.FC<{ children: ReactNode }> = ({ child
     saveInFlightRef.current = true;
 
     try {
-      await saveFinancialData(userId, next);
+      const updatedAt = await saveFinancialData(userId, next);
 
       saveRetryCountRef.current = 0;
+      serverUpdatedAtRef.current = updatedAt;
 
       // Only settle if nothing changed while this write was in flight;
       // otherwise the newer edit still owns the dirty state.
       if (mutationGenerationRef.current === generationAtStart && userIdRef.current === userId) {
         localDirtyRef.current = false;
-        saveCachedFinancialData(userId, next, false);
+        saveCachedFinancialData(userId, next, false, updatedAt);
       }
     } catch (error) {
       console.error('Error saving financial data:', error);
@@ -270,7 +275,7 @@ export const FinancialDataProvider: React.FC<{ children: ReactNode }> = ({ child
     const mutationGenerationAtStart = mutationGenerationRef.current;
 
     try {
-      const loadedData = await withTimeout(
+      const snapshot = await withTimeout(
         loadFinancialData(userId),
         DATA_LOAD_TIMEOUT_MS,
         `Financial data load timed out after ${DATA_LOAD_TIMEOUT_MS}ms`,
@@ -287,8 +292,9 @@ export const FinancialDataProvider: React.FC<{ children: ReactNode }> = ({ child
         return;
       }
 
-      applyData(loadedData);
-      saveCachedFinancialData(userId, loadedData, false);
+      serverUpdatedAtRef.current = snapshot.updatedAt;
+      applyData(snapshot.data);
+      saveCachedFinancialData(userId, snapshot.data, false, snapshot.updatedAt);
     } catch (error) {
       console.error('Error refreshing financial data from server:', error);
     } finally {
@@ -298,6 +304,55 @@ export const FinancialDataProvider: React.FC<{ children: ReactNode }> = ({ child
       loadingDataRef.current = false;
     }
   }, [applyData]);
+
+  /**
+   * Push a snapshot left dirty by an earlier session - but only onto the exact
+   * server revision it was built from.
+   *
+   * Replaying blindly is how a stale cache wipes out edits made anywhere else:
+   * the snapshot is a whole dataset, so overwriting with it reverts every
+   * record the other session added. When the server has moved on, the server
+   * copy wins and the local one is parked in a backup key instead of lost.
+   */
+  const replayDirtyCache = useCallback(async (
+    userId: string,
+    cachedData: FinancialData,
+    cachedServerUpdatedAt: string | null,
+  ) => {
+    try {
+      const snapshot = await withTimeout(
+        loadFinancialData(userId),
+        DATA_LOAD_TIMEOUT_MS,
+        `Financial data load timed out after ${DATA_LOAD_TIMEOUT_MS}ms`,
+      );
+
+      if (activeUserIdRef.current !== userId) {
+        return;
+      }
+
+      if (canReplayDirtyCache({
+        cachedServerUpdatedAt,
+        currentServerUpdatedAt: snapshot.updatedAt,
+      })) {
+        serverUpdatedAtRef.current = snapshot.updatedAt;
+        await persist(cachedData);
+        return;
+      }
+
+      // The row was written elsewhere since this snapshot was taken. Keep the
+      // server copy and park the local one rather than overwriting either.
+      backupUnreplayableSnapshot(userId, cachedData);
+      localDirtyRef.current = false;
+      serverUpdatedAtRef.current = snapshot.updatedAt;
+      applyData(snapshot.data);
+      saveCachedFinancialData(userId, snapshot.data, false, snapshot.updatedAt);
+      toast.warning('Unsynced local changes were set aside - this device was behind the saved data');
+    } catch (error) {
+      // Could not check the server. Stay dirty and keep the local snapshot; the
+      // next load tries again rather than guessing.
+      console.error('Error replaying cached financial data:', error);
+    }
+  }, [applyData, persist]);
 
   // Load data when user logs in
   useEffect(() => {
@@ -316,14 +371,14 @@ export const FinancialDataProvider: React.FC<{ children: ReactNode }> = ({ child
 
       if (cached) {
         applyData(cached.data);
-        localDirtyRef.current = cached.dirty;
+        serverUpdatedAtRef.current = cached.serverUpdatedAt;
         setIsLoading(false);
 
         if (cached.dirty) {
-          // A previous session ended before its save landed. Push it now
-          // instead of pulling the stale server copy over it.
-          void persist(cached.data);
+          localDirtyRef.current = true;
+          void replayDirtyCache(user.id, cached.data, cached.serverUpdatedAt);
         } else {
+          localDirtyRef.current = false;
           void refreshDataFromServer(user.id, false);
         }
         return;
@@ -340,7 +395,7 @@ export const FinancialDataProvider: React.FC<{ children: ReactNode }> = ({ child
     };
 
     loadData();
-  }, [user, refreshDataFromServer, applyData, persist]);
+  }, [user, refreshDataFromServer, applyData, replayDirtyCache]);
 
   useEffect(() => {
     if (!user) {

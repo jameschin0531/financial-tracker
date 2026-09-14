@@ -1,8 +1,13 @@
 import type { FinancialData } from '../types/financial';
 import { getSupabase, getSupabaseCredentials, isSupabaseInitialized } from './supabaseClient';
 
-const FINANCIAL_DATA_CACHE_VERSION = 'v2';
-const LEGACY_CACHE_VERSIONS = ['v1'];
+const FINANCIAL_DATA_CACHE_VERSION = 'v3';
+const LEGACY_CACHE_VERSIONS = ['v2', 'v1'];
+
+/** Where a local snapshot is parked when it cannot be safely replayed. */
+const getConflictBackupKey = (userId: string): string => {
+  return `financial-data-conflict:${userId}`;
+};
 
 /**
  * A cached dataset plus whether it holds edits the server has not acknowledged.
@@ -12,13 +17,49 @@ const LEGACY_CACHE_VERSIONS = ['v1'];
 export interface CachedFinancialData {
   data: FinancialData;
   dirty: boolean;
+  /**
+   * `updated_at` of the server row this snapshot was built from. A dirty
+   * snapshot may only be replayed onto a server row still at this revision -
+   * otherwise the row has been written elsewhere since, and replaying would
+   * destroy that newer data.
+   */
+  serverUpdatedAt: string | null;
 }
 
 interface CacheEnvelope {
   version: string;
   data: FinancialData;
   dirty: boolean;
+  serverUpdatedAt: string | null;
 }
+
+export interface RemoteFinancialData {
+  data: FinancialData;
+  updatedAt: string | null;
+}
+
+export interface DirtyReplayInput {
+  cachedServerUpdatedAt: string | null;
+  currentServerUpdatedAt: string | null;
+}
+
+/**
+ * Whether a dirty cached snapshot may be pushed over the current server row.
+ *
+ * Only when the server is still at the exact revision the snapshot was built
+ * from. An unknown revision on either side is not evidence of safety - it is
+ * the case where a stale snapshot would silently overwrite good data.
+ */
+export const canReplayDirtyCache = ({
+  cachedServerUpdatedAt,
+  currentServerUpdatedAt,
+}: DirtyReplayInput): boolean => {
+  if (!cachedServerUpdatedAt || !currentServerUpdatedAt) {
+    return false;
+  }
+
+  return cachedServerUpdatedAt === currentServerUpdatedAt;
+};
 
 const getFinancialDataCacheKey = (userId: string, version = FINANCIAL_DATA_CACHE_VERSION): string => {
   return `financial-data-cache:${version}:${userId}`;
@@ -115,7 +156,7 @@ export const getDefaultFinancialData = getDefaultData;
  * error would replace live state with an empty dataset, which the next mutation
  * would then persist over the user's real records.
  */
-export const loadFinancialData = async (userId: string): Promise<FinancialData> => {
+export const loadFinancialData = async (userId: string): Promise<RemoteFinancialData> => {
   if (!isSupabaseInitialized()) {
     throw new Error('Supabase not initialized');
   }
@@ -124,23 +165,25 @@ export const loadFinancialData = async (userId: string): Promise<FinancialData> 
 
   const { data, error } = await supabase
     .from('financial_data')
-    .select('data')
+    .select('data, updated_at')
     .eq('user_id', userId)
     .single();
 
   if (error) {
     if (error.code === 'PGRST116') {
       // No row yet for this user: an empty dataset is the correct snapshot.
-      return getDefaultData();
+      return { data: getDefaultData(), updatedAt: null };
     }
     throw error;
   }
 
+  const updatedAt = (data?.updated_at as string | null) ?? null;
+
   if (data && data.data) {
-    return migrateDataFormat(data.data);
+    return { data: migrateDataFormat(data.data), updatedAt };
   }
 
-  return getDefaultData();
+  return { data: getDefaultData(), updatedAt };
 };
 
 const readCacheEntry = (key: string): unknown => {
@@ -167,15 +210,22 @@ export const loadCachedFinancialData = (userId: string): CachedFinancialData | n
     const parsed = readCacheEntry(getFinancialDataCacheKey(userId));
 
     if (isCacheEnvelope(parsed)) {
-      return { data: migrateDataFormat(parsed.data), dirty: parsed.dirty === true };
+      return {
+        data: migrateDataFormat(parsed.data),
+        dirty: parsed.dirty === true,
+        serverUpdatedAt: parsed.serverUpdatedAt ?? null,
+      };
     }
 
-    // Older caches stored the bare dataset with no sync state. Treat them as
-    // dirty so anything they hold is pushed up rather than silently dropped.
+    // Older caches carry no server revision, so a dirty claim in one cannot be
+    // verified against the server. They are read as clean: an unverifiable
+    // replay would overwrite the whole dataset, which is far worse than
+    // re-fetching a snapshot the server already has.
     for (const version of LEGACY_CACHE_VERSIONS) {
       const legacy = readCacheEntry(getFinancialDataCacheKey(userId, version));
       if (legacy) {
-        return { data: migrateDataFormat(legacy), dirty: true };
+        const legacyData = isCacheEnvelope(legacy) ? legacy.data : legacy;
+        return { data: migrateDataFormat(legacyData), dirty: false, serverUpdatedAt: null };
       }
     }
 
@@ -190,48 +240,74 @@ export const saveCachedFinancialData = (
   userId: string,
   data: FinancialData,
   dirty: boolean,
+  serverUpdatedAt: string | null,
 ): void => {
   try {
     if (typeof window === 'undefined' || !window.localStorage) {
       return;
     }
 
-    const envelope: CacheEnvelope = { version: FINANCIAL_DATA_CACHE_VERSION, data, dirty };
+    const envelope: CacheEnvelope = {
+      version: FINANCIAL_DATA_CACHE_VERSION,
+      data,
+      dirty,
+      serverUpdatedAt,
+    };
     window.localStorage.setItem(getFinancialDataCacheKey(userId), JSON.stringify(envelope));
   } catch (error) {
     console.error('Error saving cached financial data:', error);
   }
 };
 
-export const saveFinancialData = async (userId: string, data: FinancialData): Promise<void> => {
+/**
+ * Park a local snapshot that could not be replayed, so a conflict never means
+ * the data is simply gone.
+ */
+export const backupUnreplayableSnapshot = (userId: string, data: FinancialData): void => {
   try {
-    if (!isSupabaseInitialized()) {
-      throw new Error('Supabase not initialized');
+    if (typeof window === 'undefined' || !window.localStorage) {
+      return;
     }
 
-    const supabase = getSupabase();
-    
-    console.log('Saving financial data for user:', userId);
-    
-    const { error } = await supabase
-      .from('financial_data')
-      .upsert({
-        user_id: userId,
-        data: data,
-        updated_at: new Date().toISOString(),
-      }, {
-        onConflict: 'user_id',
-      });
-
-    if (error) {
-      throw error;
-    }
-
-    console.log('Financial data saved successfully');
+    window.localStorage.setItem(getConflictBackupKey(userId), JSON.stringify({
+      savedAt: new Date().toISOString(),
+      data,
+    }));
   } catch (error) {
-    console.error('Error saving financial data:', error);
+    console.error('Error backing up unreplayable snapshot:', error);
+  }
+};
+
+/**
+ * Persist to Supabase and resolve with the `updated_at` the server stored.
+ *
+ * `updated_at` is deliberately not sent: a BEFORE UPDATE trigger stamps it with
+ * the database clock, so the stored value is read back from the row. That value
+ * is what later tells a stale cache apart from a current one.
+ */
+export const saveFinancialData = async (userId: string, data: FinancialData): Promise<string | null> => {
+  if (!isSupabaseInitialized()) {
+    throw new Error('Supabase not initialized');
+  }
+
+  const supabase = getSupabase();
+
+  const { data: saved, error } = await supabase
+    .from('financial_data')
+    .upsert({
+      user_id: userId,
+      data: data,
+    }, {
+      onConflict: 'user_id',
+    })
+    .select('updated_at')
+    .single();
+
+  if (error) {
     throw error;
   }
+
+  return (saved?.updated_at as string | null) ?? null;
 };
 
 /**
