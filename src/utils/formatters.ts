@@ -22,6 +22,14 @@ export const formatCurrency = (amount: number, currency: 'MYR' | 'USD' | 'HKD' =
     return MASKED_AMOUNT;
   }
 
+  return formatCurrencyUnmasked(amount, currency);
+};
+
+/**
+ * Formats an amount without honouring the hide-amounts toggle.
+ * Only for output the user explicitly asked for (e.g. file exports), never on-screen UI.
+ */
+export const formatCurrencyUnmasked = (amount: number, currency: 'MYR' | 'USD' | 'HKD' = 'MYR'): string => {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: currency,
