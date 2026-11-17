@@ -1,245 +1,191 @@
-import type { FinancialData } from '../../types/financial';
-import { formatCurrency, formatDate } from '../../utils/formatters';
 import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
+import type { FinancialData } from '../../types/financial';
+import { formatCurrencyUnmasked, formatDate } from '../../utils/formatters';
+import { getUSDToHKDRate, getUSDToMYRRate } from '../../services/exchangeRateService';
+import {
+  buildExportReport,
+  reportToCSV,
+  type ExportCell,
+  type ExportReport,
+} from '../../services/exportReport';
 
-export const exportToCSV = (data: FinancialData): void => {
-  const csvRows: string[] = [];
+const fileStamp = (date: Date): string => date.toISOString().slice(0, 10);
 
-  // Assets
-  csvRows.push('ASSETS');
-  csvRows.push('Name,Category,Value,Date');
-  data.assets.forEach(asset => {
-    csvRows.push(`"${asset.name}","${asset.category}",${asset.value},"${asset.date}"`);
-  });
-  csvRows.push('');
+const loadReport = async (data: FinancialData): Promise<ExportReport> => {
+  const [usdToMyr, usdToHkd] = await Promise.all([getUSDToMYRRate(), getUSDToHKDRate()]);
+  return buildExportReport(data, { usdToMyr, usdToHkd });
+};
 
-  // Liabilities
-  csvRows.push('LIABILITIES');
-  csvRows.push('Name,Category,Amount,Interest Rate,Date');
-  data.liabilities.forEach(liability => {
-    csvRows.push(`"${liability.name}","${liability.category}",${liability.amount},${liability.interestRate || ''},"${liability.date}"`);
-  });
-  csvRows.push('');
-
-  // Income
-  csvRows.push('INCOME');
-  csvRows.push('Source,Amount,Frequency,Date');
-  data.income.forEach(income => {
-    csvRows.push(`"${income.source}",${income.amount},"${income.frequency}","${income.date}"`);
-  });
-  csvRows.push('');
-
-  // Expenses
-  csvRows.push('EXPENSES');
-  csvRows.push('Category,Amount,Date,Description');
-  data.expenses.forEach(expense => {
-    csvRows.push(`"${expense.category}",${expense.amount},"${expense.date}","${expense.description || ''}"`);
-  });
-
-  const csvContent = csvRows.join('\n');
-  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-  const link = document.createElement('a');
+const downloadBlob = (blob: Blob, filename: string): void => {
   const url = URL.createObjectURL(blob);
-  
-  link.setAttribute('href', url);
-  link.setAttribute('download', `financial-data-${new Date().toISOString().split('T')[0]}.csv`);
-  link.style.visibility = 'hidden';
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.style.display = 'none';
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
+  // Revoke after the click has been handled so the download is not cancelled.
+  setTimeout(() => URL.revokeObjectURL(url), 0);
 };
 
+export const exportToCSV = async (data: FinancialData): Promise<void> => {
+  const report = await loadReport(data);
+  // BOM so Excel opens the file as UTF-8.
+  const blob = new Blob(['﻿', reportToCSV(report)], { type: 'text/csv;charset=utf-8;' });
+  downloadBlob(blob, `financial-data-${fileStamp(report.generatedAt)}.csv`);
+};
+
+const formatCell = (cell: ExportCell): string => {
+  switch (cell.kind) {
+    case 'text':
+      return cell.value;
+    case 'money':
+      return formatCurrencyUnmasked(cell.value, cell.currency);
+    case 'number':
+      return cell.value.toLocaleString('en-US', { maximumFractionDigits: 8 });
+    case 'date':
+      return cell.value ? formatDate(cell.value) : '';
+  }
+};
+
+const isNumeric = (cell: ExportCell | undefined): boolean =>
+  cell?.kind === 'money' || cell?.kind === 'number';
+
 export const exportToPDF = async (data: FinancialData): Promise<void> => {
-  const pdf = new jsPDF('p', 'mm', 'a4');
+  const report = await loadReport(data);
+
+  const pdf = new jsPDF('l', 'mm', 'a4');
   const pageWidth = pdf.internal.pageSize.getWidth();
   const pageHeight = pdf.internal.pageSize.getHeight();
   const margin = 15;
-  let yPosition = margin;
+  const contentWidth = pageWidth - 2 * margin;
+  const cellPadding = 1.5;
+  const rowHeight = 6;
+  let y = margin;
 
-  // Helper function to add a new page if needed
-  const checkNewPage = (requiredHeight: number) => {
-    if (yPosition + requiredHeight > pageHeight - margin) {
+  const ensureSpace = (height: number): boolean => {
+    if (y + height > pageHeight - margin) {
       pdf.addPage();
-      yPosition = margin;
+      y = margin;
+      return true;
     }
+    return false;
+  };
+
+  const fit = (value: string, width: number): string => {
+    const max = width - 2 * cellPadding;
+    if (pdf.getTextWidth(value) <= max) return value;
+    let truncated = value;
+    while (truncated.length > 0 && pdf.getTextWidth(`${truncated}...`) > max) {
+      truncated = truncated.slice(0, -1);
+    }
+    return `${truncated}...`;
   };
 
   // Title
+  pdf.setFont('helvetica', 'bold');
   pdf.setFontSize(18);
   pdf.setTextColor(74, 158, 255);
-  pdf.text('Financial Report', margin, yPosition);
-  yPosition += 10;
+  pdf.text('Financial Report', margin, y + 4);
+  y += 11;
 
+  pdf.setFont('helvetica', 'normal');
   pdf.setFontSize(10);
+  pdf.setTextColor(90, 90, 90);
+  pdf.text(
+    `Generated ${report.generatedAt.toLocaleString('en-US')} - all totals in MYR`,
+    margin,
+    y,
+  );
+  y += 10;
+
+  // Summary
   pdf.setTextColor(0, 0, 0);
-  pdf.text(`Generated: ${new Date().toLocaleDateString()}`, margin, yPosition);
-  yPosition += 15;
-
-  // Summary Section
+  pdf.setFont('helvetica', 'bold');
   pdf.setFontSize(14);
-  pdf.text('Summary', margin, yPosition);
-  yPosition += 8;
-
+  pdf.text('Summary', margin, y);
+  y += 7;
   pdf.setFontSize(10);
-  const totalAssets = data.assets.reduce((sum, a) => sum + a.value, 0);
-  const totalLiabilities = data.liabilities.reduce((sum, l) => sum + l.amount, 0);
-  const netWorth = totalAssets - totalLiabilities;
+  const summaryRows: Array<[string, number]> = [
+    ['Total Assets', report.summary.totalAssets],
+    ['Total Liabilities', report.summary.totalLiabilities],
+    ['Net Worth', report.summary.netWorth],
+  ];
+  summaryRows.forEach(([label, value]) => {
+    pdf.setFont('helvetica', 'normal');
+    pdf.text(label, margin, y);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text(formatCurrencyUnmasked(value, 'MYR'), margin + 95, y, { align: 'right' });
+    y += 6;
+  });
+  y += 6;
 
-  pdf.text(`Total Assets: ${formatCurrency(totalAssets)}`, margin, yPosition);
-  yPosition += 6;
-  pdf.text(`Total Liabilities: ${formatCurrency(totalLiabilities)}`, margin, yPosition);
-  yPosition += 6;
-  pdf.text(`Net Worth: ${formatCurrency(netWorth)}`, margin, yPosition);
-  yPosition += 10;
+  report.sections.forEach((section) => {
+    const totalWeight = section.columns.reduce((acc, c) => acc + c.weight, 0);
+    const layout = section.columns.map((col, i) => ({
+      header: col.header,
+      width: (col.weight / totalWeight) * contentWidth,
+      numeric: section.rows.some((row) => isNumeric(row[i])),
+    }));
 
-  // Assets Section
-  checkNewPage(20);
-  pdf.setFontSize(14);
-  pdf.text('Assets', margin, yPosition);
-  yPosition += 8;
-
-  if (data.assets.length > 0) {
-    pdf.setFontSize(9);
-    pdf.text('Name', margin, yPosition);
-    pdf.text('Category', margin + 50, yPosition);
-    pdf.text('Value', margin + 100, yPosition);
-    pdf.text('Date', margin + 140, yPosition);
-    yPosition += 5;
-
-    data.assets.forEach(asset => {
-      checkNewPage(8);
-      pdf.text(asset.name.substring(0, 20), margin, yPosition);
-      pdf.text(asset.category.substring(0, 15), margin + 50, yPosition);
-      pdf.text(formatCurrency(asset.value), margin + 100, yPosition);
-      pdf.text(formatDate(asset.date), margin + 140, yPosition);
-      yPosition += 6;
-    });
-  } else {
-    pdf.text('No assets recorded', margin, yPosition);
-    yPosition += 6;
-  }
-  yPosition += 5;
-
-  // Liabilities Section
-  checkNewPage(20);
-  pdf.setFontSize(14);
-  pdf.text('Liabilities', margin, yPosition);
-  yPosition += 8;
-
-  if (data.liabilities.length > 0) {
-    pdf.setFontSize(9);
-    pdf.text('Name', margin, yPosition);
-    pdf.text('Category', margin + 50, yPosition);
-    pdf.text('Amount', margin + 100, yPosition);
-    pdf.text('Date', margin + 140, yPosition);
-    yPosition += 5;
-
-    data.liabilities.forEach(liability => {
-      checkNewPage(8);
-      pdf.text(liability.name.substring(0, 20), margin, yPosition);
-      pdf.text(liability.category.substring(0, 15), margin + 50, yPosition);
-      pdf.text(formatCurrency(liability.amount), margin + 100, yPosition);
-      pdf.text(formatDate(liability.date), margin + 140, yPosition);
-      yPosition += 6;
-    });
-  } else {
-    pdf.text('No liabilities recorded', margin, yPosition);
-    yPosition += 6;
-  }
-  yPosition += 5;
-
-  // Income Section
-  checkNewPage(20);
-  pdf.setFontSize(14);
-  pdf.text('Income', margin, yPosition);
-  yPosition += 8;
-
-  if (data.income.length > 0) {
-    pdf.setFontSize(9);
-    pdf.text('Source', margin, yPosition);
-    pdf.text('Amount', margin + 60, yPosition);
-    pdf.text('Frequency', margin + 100, yPosition);
-    pdf.text('Date', margin + 140, yPosition);
-    yPosition += 5;
-
-    data.income.forEach(income => {
-      checkNewPage(8);
-      pdf.text(income.source.substring(0, 20), margin, yPosition);
-      pdf.text(formatCurrency(income.amount), margin + 60, yPosition);
-      pdf.text(income.frequency, margin + 100, yPosition);
-      pdf.text(formatDate(income.date), margin + 140, yPosition);
-      yPosition += 6;
-    });
-  } else {
-    pdf.text('No income recorded', margin, yPosition);
-    yPosition += 6;
-  }
-  yPosition += 5;
-
-  // Expenses Section
-  checkNewPage(20);
-  pdf.setFontSize(14);
-  pdf.text('Expenses', margin, yPosition);
-  yPosition += 8;
-
-  if (data.expenses.length > 0) {
-    pdf.setFontSize(9);
-    pdf.text('Category', margin, yPosition);
-    pdf.text('Amount', margin + 60, yPosition);
-    pdf.text('Date', margin + 100, yPosition);
-    pdf.text('Description', margin + 140, yPosition);
-    yPosition += 5;
-
-    data.expenses.forEach(expense => {
-      checkNewPage(8);
-      pdf.text(expense.category.substring(0, 15), margin, yPosition);
-      pdf.text(formatCurrency(expense.amount), margin + 60, yPosition);
-      pdf.text(formatDate(expense.date), margin + 100, yPosition);
-      pdf.text((expense.description || '').substring(0, 15), margin + 140, yPosition);
-      yPosition += 6;
-    });
-  } else {
-    pdf.text('No expenses recorded', margin, yPosition);
-    yPosition += 6;
-  }
-
-  // Try to capture charts if they exist
-  try {
-    const chartElements = document.querySelectorAll('[data-chart="true"]');
-    if (chartElements.length > 0) {
-      pdf.addPage();
-      yPosition = margin;
-      pdf.setFontSize(14);
-      pdf.text('Charts', margin, yPosition);
-      yPosition += 10;
-
-      for (let i = 0; i < chartElements.length; i++) {
-        const element = chartElements[i] as HTMLElement;
-        checkNewPage(80);
-        
-        const canvas = await html2canvas(element, {
-          backgroundColor: null,
-          scale: 2,
-        });
-        
-        const imgData = canvas.toDataURL('image/png');
-        const imgWidth = pageWidth - 2 * margin;
-        const imgHeight = (canvas.height * imgWidth) / canvas.width;
-        
-        if (yPosition + imgHeight > pageHeight - margin) {
-          pdf.addPage();
-          yPosition = margin;
+    const drawCells = (values: string[]) => {
+      let x = margin;
+      layout.forEach((col, i) => {
+        const value = fit(values[i] ?? '', col.width);
+        if (col.numeric) {
+          pdf.text(value, x + col.width - cellPadding, y, { align: 'right' });
+        } else {
+          pdf.text(value, x + cellPadding, y);
         }
-        
-        pdf.addImage(imgData, 'PNG', margin, yPosition, imgWidth, imgHeight);
-        yPosition += imgHeight + 10;
-      }
+        x += col.width;
+      });
+      y += rowHeight;
+    };
+
+    const drawHeader = () => {
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(9);
+      pdf.setFillColor(235, 240, 248);
+      pdf.rect(margin, y - 4.2, contentWidth, rowHeight, 'F');
+      drawCells(layout.map((col) => col.header));
+      pdf.setFont('helvetica', 'normal');
+    };
+
+    // Keep the section title with its header and first row.
+    ensureSpace(8 + rowHeight * 2);
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(13);
+    pdf.text(section.title, margin, y);
+    y += 7;
+
+    if (section.rows.length === 0) {
+      pdf.setFont('helvetica', 'italic');
+      pdf.setFontSize(9);
+      pdf.setTextColor(120, 120, 120);
+      pdf.text(section.emptyMessage, margin, y);
+      pdf.setTextColor(0, 0, 0);
+      y += 10;
+      return;
     }
-  } catch (error) {
-    console.error('Error capturing charts:', error);
-  }
 
-  pdf.save(`financial-report-${new Date().toISOString().split('T')[0]}.pdf`);
+    drawHeader();
+    section.rows.forEach((row) => {
+      if (ensureSpace(rowHeight)) drawHeader();
+      drawCells(row.map(formatCell));
+    });
+
+    if (section.totalMYR !== undefined) {
+      ensureSpace(rowHeight);
+      pdf.setDrawColor(200, 200, 200);
+      pdf.line(margin, y - 4.5, margin + contentWidth, y - 4.5);
+      pdf.setFont('helvetica', 'bold');
+      const total = formatCurrencyUnmasked(section.totalMYR, 'MYR');
+      drawCells(layout.map((col, i) => (i === 0 ? 'Total' : col.header === 'Value (MYR)' ? total : '')));
+      pdf.setFont('helvetica', 'normal');
+    }
+    y += 6;
+  });
+
+  pdf.save(`financial-report-${fileStamp(report.generatedAt)}.pdf`);
 };
-
