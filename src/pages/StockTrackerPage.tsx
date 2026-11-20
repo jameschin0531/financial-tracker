@@ -14,6 +14,7 @@ import { groupHoldingsByCode, filterGroupedHoldings, sortGroupedHoldings, type G
 import StockHoldingForm from '../components/Stocks/StockHoldingForm';
 import TradingAccountForm from '../components/Stocks/TradingAccountForm';
 import DepositForm from '../components/Stocks/DepositForm';
+import HoldingsExportButton from '../components/Stocks/HoldingsExportButton';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -120,6 +121,12 @@ const StockTrackerPage: React.FC = () => {
     filterPortionMax
   );
   const sortedGroupedHoldings = sortGroupedHoldings(filteredGroupedHoldings, sortBy);
+  const exportFilterNote = [
+    filterAccount !== 'all' ? `account ${filterAccount}` : '',
+    filterPandL !== 'all' ? `${filterPandL} only` : '',
+    filterPortionMin ? `portion >= ${filterPortionMin}%` : '',
+    filterPortionMax ? `portion <= ${filterPortionMax}%` : '',
+  ].filter(Boolean).join(', ');
   const totalPortfolioPandL = groupedHoldings.reduce((sum, group) => sum + group.totalPandL.myr, 0);
   const totalPortfolioCostBasis = portfolioValue.myr - totalPortfolioPandL;
   const totalPortfolioPandLPercentage = totalPortfolioCostBasis > 0
@@ -276,7 +283,15 @@ const StockTrackerPage: React.FC = () => {
       <section className="space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <h2 className="text-xl font-semibold tracking-tight">Investment Holdings</h2>
-          <Button onClick={() => setEditingHolding('new')}>+ Add Holding</Button>
+          <div className="flex gap-2">
+            <HoldingsExportButton
+              groups={sortedGroupedHoldings}
+              rates={exchangeRates}
+              portfolioValueMYR={portfolioValue.myr}
+              filterNote={exportFilterNote}
+            />
+            <Button onClick={() => setEditingHolding('new')}>+ Add Holding</Button>
+          </div>
         </div>
 
         {editingHolding === null && data.stockHoldings.length === 0 ? (
