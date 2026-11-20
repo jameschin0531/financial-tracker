@@ -24,6 +24,8 @@ export interface ExportSection {
   emptyMessage: string;
   /** Section total in MYR, when the section has one. */
   totalMYR?: number;
+  /** Full total row; when set, it replaces the MYR-only total and is also written to CSV. */
+  totalRow?: ExportCell[];
 }
 
 export interface ExportReport {
@@ -248,16 +250,29 @@ const csvCell = (cell: ExportCell): string => {
   }
 };
 
-/** Builds CSV text. Money cells are raw numbers; the column header carries the currency. */
-export const reportToCSV = (report: ExportReport): string => {
-  const lines: string[] = [];
-  lines.push(csvQuote('Financial Report'));
-  lines.push(`${csvQuote('Generated')},${csvQuote(report.generatedAt.toISOString())}`);
-  lines.push(`${csvQuote('Total Assets (MYR)')},${report.summary.totalAssets.toFixed(2)}`);
-  lines.push(`${csvQuote('Total Liabilities (MYR)')},${report.summary.totalLiabilities.toFixed(2)}`);
-  lines.push(`${csvQuote('Net Worth (MYR)')},${report.summary.netWorth.toFixed(2)}`);
+export interface SummaryLine {
+  label: string;
+  value: number;
+  currency: Currency;
+}
 
-  report.sections.forEach((section) => {
+/** Builds CSV text for any set of sections. Money cells are raw numbers; headers carry the currency. */
+export const sectionsToCSV = (
+  title: string,
+  generatedAt: Date,
+  summary: SummaryLine[],
+  sections: ExportSection[],
+  notes: string[] = [],
+): string => {
+  const lines: string[] = [];
+  lines.push(csvQuote(title));
+  lines.push(`${csvQuote('Generated')},${csvQuote(generatedAt.toISOString())}`);
+  notes.forEach((note) => lines.push(csvQuote(neutraliseFormula(note))));
+  summary.forEach((line) => {
+    lines.push(`${csvQuote(`${line.label} (${line.currency})`)},${line.value.toFixed(2)}`);
+  });
+
+  sections.forEach((section) => {
     lines.push('');
     lines.push(csvQuote(section.title.toUpperCase()));
     const headers = section.columns.flatMap((col) =>
@@ -271,7 +286,24 @@ export const reportToCSV = (report: ExportReport): string => {
       });
       lines.push(cells.join(','));
     });
+    if (section.totalRow) {
+      const cells = section.totalRow.flatMap((cell, i) => {
+        if (!section.columns[i]?.hasCurrency) return [csvCell(cell)];
+        return [csvCell(cell), csvQuote(cell.kind === 'money' ? cell.currency : '')];
+      });
+      lines.push(cells.join(','));
+    }
   });
 
   return lines.join('\r\n');
 };
+
+export const reportSummaryLines = (report: ExportReport): SummaryLine[] => [
+  { label: 'Total Assets', value: report.summary.totalAssets, currency: 'MYR' },
+  { label: 'Total Liabilities', value: report.summary.totalLiabilities, currency: 'MYR' },
+  { label: 'Net Worth', value: report.summary.netWorth, currency: 'MYR' },
+];
+
+/** Builds CSV text. Money cells are raw numbers; the column header carries the currency. */
+export const reportToCSV = (report: ExportReport): string =>
+  sectionsToCSV('Financial Report', report.generatedAt, reportSummaryLines(report), report.sections);

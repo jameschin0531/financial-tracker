@@ -4,16 +4,24 @@ import { formatCurrencyUnmasked, formatDate } from '../../utils/formatters';
 import { getUSDToHKDRate, getUSDToMYRRate } from '../../services/exchangeRateService';
 import {
   buildExportReport,
+  reportSummaryLines,
   reportToCSV,
   type ExportCell,
   type ExportReport,
+  type ExportSection,
+  type SummaryLine,
 } from '../../services/exportReport';
 
-const fileStamp = (date: Date): string => date.toISOString().slice(0, 10);
+export const fileStamp = (date: Date): string => date.toISOString().slice(0, 10);
 
 const loadReport = async (data: FinancialData): Promise<ExportReport> => {
   const [usdToMyr, usdToHkd] = await Promise.all([getUSDToMYRRate(), getUSDToHKDRate()]);
   return buildExportReport(data, { usdToMyr, usdToHkd });
+};
+
+export const downloadCSV = (csv: string, filename: string): void => {
+  // BOM so Excel opens the file as UTF-8.
+  downloadBlob(new Blob(['\uFEFF', csv], { type: 'text/csv;charset=utf-8;' }), filename);
 };
 
 const downloadBlob = (blob: Blob, filename: string): void => {
@@ -31,9 +39,7 @@ const downloadBlob = (blob: Blob, filename: string): void => {
 
 export const exportToCSV = async (data: FinancialData): Promise<void> => {
   const report = await loadReport(data);
-  // BOM so Excel opens the file as UTF-8.
-  const blob = new Blob(['﻿', reportToCSV(report)], { type: 'text/csv;charset=utf-8;' });
-  downloadBlob(blob, `financial-data-${fileStamp(report.generatedAt)}.csv`);
+  downloadCSV(reportToCSV(report), `financial-data-${fileStamp(report.generatedAt)}.csv`);
 };
 
 const formatCell = (cell: ExportCell): string => {
@@ -52,9 +58,27 @@ const formatCell = (cell: ExportCell): string => {
 const isNumeric = (cell: ExportCell | undefined): boolean =>
   cell?.kind === 'money' || cell?.kind === 'number';
 
+export interface PDFDocumentSpec {
+  title: string;
+  subtitle: string;
+  notes?: string[];
+  summary: SummaryLine[];
+  sections: ExportSection[];
+  filename: string;
+}
+
 export const exportToPDF = async (data: FinancialData): Promise<void> => {
   const report = await loadReport(data);
+  renderSectionsPDF({
+    title: 'Financial Report',
+    subtitle: `Generated ${report.generatedAt.toLocaleString('en-US')} - all totals in MYR`,
+    summary: reportSummaryLines(report),
+    sections: report.sections,
+    filename: `financial-report-${fileStamp(report.generatedAt)}.pdf`,
+  });
+};
 
+export const renderSectionsPDF = (spec: PDFDocumentSpec): void => {
   const pdf = new jsPDF('l', 'mm', 'a4');
   const pageWidth = pdf.internal.pageSize.getWidth();
   const pageHeight = pdf.internal.pageSize.getHeight();
@@ -87,18 +111,19 @@ export const exportToPDF = async (data: FinancialData): Promise<void> => {
   pdf.setFont('helvetica', 'bold');
   pdf.setFontSize(18);
   pdf.setTextColor(74, 158, 255);
-  pdf.text('Financial Report', margin, y + 4);
+  pdf.text(spec.title, margin, y + 4);
   y += 11;
 
   pdf.setFont('helvetica', 'normal');
   pdf.setFontSize(10);
   pdf.setTextColor(90, 90, 90);
-  pdf.text(
-    `Generated ${report.generatedAt.toLocaleString('en-US')} - all totals in MYR`,
-    margin,
-    y,
-  );
-  y += 10;
+  pdf.text(spec.subtitle, margin, y);
+  y += 6;
+  (spec.notes ?? []).forEach((note) => {
+    pdf.text(fit(note, contentWidth), margin, y);
+    y += 5;
+  });
+  y += 4;
 
   // Summary
   pdf.setTextColor(0, 0, 0);
@@ -107,21 +132,16 @@ export const exportToPDF = async (data: FinancialData): Promise<void> => {
   pdf.text('Summary', margin, y);
   y += 7;
   pdf.setFontSize(10);
-  const summaryRows: Array<[string, number]> = [
-    ['Total Assets', report.summary.totalAssets],
-    ['Total Liabilities', report.summary.totalLiabilities],
-    ['Net Worth', report.summary.netWorth],
-  ];
-  summaryRows.forEach(([label, value]) => {
+  spec.summary.forEach(({ label, value, currency }) => {
     pdf.setFont('helvetica', 'normal');
     pdf.text(label, margin, y);
     pdf.setFont('helvetica', 'bold');
-    pdf.text(formatCurrencyUnmasked(value, 'MYR'), margin + 95, y, { align: 'right' });
+    pdf.text(formatCurrencyUnmasked(value, currency), margin + 95, y, { align: 'right' });
     y += 6;
   });
   y += 6;
 
-  report.sections.forEach((section) => {
+  spec.sections.forEach((section) => {
     const totalWeight = section.columns.reduce((acc, c) => acc + c.weight, 0);
     const layout = section.columns.map((col, i) => ({
       header: col.header,
@@ -175,17 +195,21 @@ export const exportToPDF = async (data: FinancialData): Promise<void> => {
       drawCells(row.map(formatCell));
     });
 
-    if (section.totalMYR !== undefined) {
+    if (section.totalRow || section.totalMYR !== undefined) {
       ensureSpace(rowHeight);
       pdf.setDrawColor(200, 200, 200);
       pdf.line(margin, y - 4.5, margin + contentWidth, y - 4.5);
       pdf.setFont('helvetica', 'bold');
-      const total = formatCurrencyUnmasked(section.totalMYR, 'MYR');
-      drawCells(layout.map((col, i) => (i === 0 ? 'Total' : col.header === 'Value (MYR)' ? total : '')));
+      if (section.totalRow) {
+        drawCells(section.totalRow.map(formatCell));
+      } else if (section.totalMYR !== undefined) {
+        const total = formatCurrencyUnmasked(section.totalMYR, 'MYR');
+        drawCells(layout.map((col, i) => (i === 0 ? 'Total' : col.header === 'Value (MYR)' ? total : '')));
+      }
       pdf.setFont('helvetica', 'normal');
     }
     y += 6;
   });
 
-  pdf.save(`financial-report-${fileStamp(report.generatedAt)}.pdf`);
+  pdf.save(spec.filename);
 };
