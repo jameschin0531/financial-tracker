@@ -46,7 +46,7 @@ export const groupHoldingsByCode = async (
     let totalMVMYR = 0;
     let totalPandLUSD = 0;
     let totalPandLMYR = 0;
-    let totalCostBasis = 0;
+    let totalCostBasisUSD = 0;
     const accounts = new Set<string>();
     
     groupHoldings.forEach(holding => {
@@ -75,13 +75,21 @@ export const groupHoldingsByCode = async (
       const pnl = calculateHoldingPandL(holding, usdToMyrRate, usdToHkdRate);
       totalPandLUSD += pnl.usd;
       totalPandLMYR += pnl.myr;
-      totalCostBasis += holding.quantity * holding.avgPrice;
+      // Cost basis must be in USD to match totalPandLUSD (avgPrice is in the holding's currency)
+      const costBasisNative = holding.quantity * holding.avgPrice;
+      if (holding.currency === 'HKD') {
+        totalCostBasisUSD += costBasisNative / usdToHkdRate;
+      } else if (holding.currency === 'MYR') {
+        totalCostBasisUSD += costBasisNative / (usdToMyrRate || holding.exchangeRate || 4.7);
+      } else {
+        totalCostBasisUSD += costBasisNative;
+      }
       
       accounts.add(holding.account);
     });
     
-    const totalPandLPercentage = totalCostBasis > 0 
-      ? (totalPandLUSD / totalCostBasis) * 100 
+    const totalPandLPercentage = totalCostBasisUSD > 0
+      ? (totalPandLUSD / totalCostBasisUSD) * 100
       : 0;
     
     const totalQuantity = groupHoldings.reduce((sum, h) => sum + h.quantity, 0);
